@@ -1,0 +1,86 @@
+<ion-header>
+  <ion-toolbar class="admin-topbar">
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Opiniones</ion-title>
+    <app-admin-actions slot="end"></app-admin-actions>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="admin-dark">
+  <ion-refresher slot="fixed" (ionRefresh)="cargar($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
+
+  <div class="opv">
+    <!-- Resumen -->
+    <div class="op-summary">
+      <div class="sum-box">
+        <div class="sum-val mono">{{ resumen?.promedio || 0 }}<ion-icon name="star"></ion-icon></div>
+        <div class="sum-lbl">Promedio</div>
+      </div>
+      <div class="sum-box">
+        <div class="sum-val mono">{{ resumen?.total || 0 }}</div>
+        <div class="sum-lbl">Reseñas</div>
+      </div>
+      <div class="sum-box" [class.alert]="resumen?.bajas">
+        <div class="sum-val mono">{{ resumen?.bajas || 0 }}</div>
+        <div class="sum-lbl">Bajas (1-2★)</div>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="cd filtros">
+      <div class="f-block">
+        <span class="f-label">Estrellas</span>
+        <div class="star-chips">
+          <button class="chip" [class.on]="filtroEstrella === null" (click)="setEstrella(null)">Todas</button>
+          <button class="chip" *ngFor="let n of [5,4,3,2,1]" [class.on]="filtroEstrella === n" (click)="setEstrella(n)">
+            {{ n }}<ion-icon name="star"></ion-icon>
+          </button>
+        </div>
+      </div>
+      <div class="f-block">
+        <span class="f-label">Mecánico</span>
+        <ion-select class="f-select" [(ngModel)]="filtroEmpleado" (ngModelChange)="onEmpleado()"
+                    interface="popover" placeholder="Todos" [interfaceOptions]="{ cssClass: 'op-sel-pop' }">
+          <ion-select-option [value]="null">Todos</ion-select-option>
+          <ion-select-option *ngFor="let t of tecnicos" [value]="t.id">{{ t.nombre }}</ion-select-option>
+        </ion-select>
+      </div>
+      <button class="limpiar" *ngIf="hayFiltro" (click)="limpiar()">
+        <ion-icon name="close-outline"></ion-icon> Limpiar filtros
+      </button>
+    </div>
+
+    <!-- Lista -->
+    <div class="cd" *ngIf="!cargando">
+      <div class="op-row" *ngFor="let o of opiniones"
+           [class.op-baja]="esBaja(o.calificacion)"
+           [class.op-clickable]="o.orden_id" (click)="abrirOpinion(o)">
+        <div class="op-main">
+          <div class="op-stars">
+            <ion-icon *ngFor="let n of estrellas" [name]="n <= o.calificacion ? 'star' : 'star-outline'"
+                      [class.on]="n <= o.calificacion"></ion-icon>
+          </div>
+          <div class="op-cliente">{{ o.cliente_nombre }} {{ o.cliente_apellido }}</div>
+          <p class="op-comentario" *ngIf="o.comentario">"{{ o.comentario }}"</p>
+          <p class="op-comentario op-sincom" *ngIf="!o.comentario">Sin comentario</p>
+        </div>
+        <div class="op-meta">
+          <span class="op-moto" *ngIf="o.marca">{{ o.marca }} {{ o.modelo }}</span>
+          <span class="mono op-orden" *ngIf="o.numero_orden">{{ o.numero_orden }}</span>
+          <span class="op-fecha">{{ fechaCortaOp(o.fecha) }}<ng-container *ngIf="o.tecnico_nombre"> · {{ o.tecnico_nombre }}</ng-container></span>
+        </div>
+      </div>
+
+      <div class="empty" *ngIf="!opiniones.length">
+        <ion-icon name="chatbox-ellipses-outline"></ion-icon>
+        <p *ngIf="hayFiltro">No hay reseñas con esos filtros.</p>
+        <p *ngIf="!hayFiltro">Todavía no hay calificaciones de clientes.</p>
+      </div>
+    </div>
+
+    <!-- Skeleton -->
+    <div class="cd" *ngIf="cargando">
+      <div class="skeleton sk-op" *ngFor="let n of [1,2,3,4]"></div>
+    </div>
+  </div>
+</ion-content>

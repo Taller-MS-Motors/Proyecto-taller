@@ -7,6 +7,7 @@ import { AdminCitasPage } from './admin-citas.page';
 import { AdminEmpleadosPage } from './admin-empleados.page';
 import { AdminTareasPage } from './admin-tareas.page';
 import { AdminReportesPage } from './admin-reportes.page';
+import { AdminOpinionesPage } from './admin-opiniones.page';
 import { AdminPromosPage } from './admin-promos.page';
 import { AdminCalendarioPage } from './admin-calendario.page';
 import { AdminConfigPage } from './admin-config.page';
@@ -23,6 +24,7 @@ import { AdminActionsComponent } from './admin-actions.component';
     AdminEmpleadosPage,
     AdminTareasPage,
     AdminReportesPage,
+    AdminOpinionesPage,
     AdminPromosPage,
     AdminCalendarioPage,
     AdminConfigPage,

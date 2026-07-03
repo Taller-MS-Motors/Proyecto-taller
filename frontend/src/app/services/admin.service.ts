@@ -25,8 +25,14 @@ export class AdminService {
   }
 
   // Opiniones reales del cliente (feed de reseñas: estrellas + comentario).
-  getOpiniones(): Observable<{ data: { opiniones: any[]; resumen: { total: number; promedio: number; bajas: number } } }> {
-    return this.http.get<{ data: any }>(`${this.url}/opiniones`);
+  // Filtros opcionales: estrellas (1-5), empleado (tecnico_id), limit.
+  getOpiniones(filtros: { estrellas?: number | null; empleado?: number | null; limit?: number } = {}):
+    Observable<{ data: { opiniones: any[]; tecnicos: { id: number; nombre: string }[]; resumen: { total: number; promedio: number; bajas: number } } }> {
+    const params: any = {};
+    if (filtros.estrellas) params.estrellas = filtros.estrellas;
+    if (filtros.empleado) params.empleado = filtros.empleado;
+    if (filtros.limit) params.limit = filtros.limit;
+    return this.http.get<{ data: any }>(`${this.url}/opiniones`, { params });
   }
 
   // Reportes analíticos por período (KPIs, serie, ingresos por servicio, rendimiento).
