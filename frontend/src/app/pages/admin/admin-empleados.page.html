@@ -14,7 +14,21 @@
         <span class="cd-title">Crear nuevo empleado</span>
         <div class="fg"><label>Nombre completo *</label><input [(ngModel)]="nuevo.nombre" placeholder="Ej: Carlos García"></div>
         <div class="fg"><label>Correo electrónico *</label><input type="email" [(ngModel)]="nuevo.email" placeholder="carlos@taller.com"></div>
-        <div class="fg"><label>Contraseña *</label><input type="password" [(ngModel)]="nuevo.password" placeholder="Mín. 6 caracteres"></div>
+        <div class="fg">
+          <label>Contraseña *</label>
+          <div style="position:relative">
+            <input [type]="verPass ? 'text' : 'password'" [(ngModel)]="nuevo.password" placeholder="Mín. 6 caracteres" style="width:100%;padding-right:42px">
+            <button type="button" (click)="verPass = !verPass" [attr.aria-label]="verPass ? 'Ocultar contraseña' : 'Ver contraseña'"
+                    style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--tx3);cursor:pointer;display:flex;padding:4px">
+              <ion-icon [name]="verPass ? 'eye-off-outline' : 'eye-outline'" style="font-size:19px"></ion-icon>
+            </button>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Confirmar contraseña *</label>
+          <input [type]="verPass ? 'text' : 'password'" [(ngModel)]="nuevo.password2" placeholder="Repetí la contraseña" style="width:100%">
+          <div class="hint" *ngIf="nuevo.password2 && !passCoincide" style="color:var(--rd)">Las contraseñas no coinciden</div>
+        </div>
         <div class="fg"><label>Teléfono (opcional)</label><input type="tel" [(ngModel)]="nuevo.telefono" placeholder="8888-8888"></div>
         <div class="fg"><label>Rol *</label>
           <select [(ngModel)]="nuevo.rol">

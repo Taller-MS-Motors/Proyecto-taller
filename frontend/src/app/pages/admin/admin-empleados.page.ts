@@ -17,7 +17,8 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
   sucursales: any[] = [];
   cargando = true;
   creando = false;
-  nuevo = { nombre: '', email: '', password: '', rol: 'tecnico', telefono: '', sucursal_id: null as number | null };
+  verPass = false;
+  nuevo = { nombre: '', email: '', password: '', password2: '', rol: 'tecnico', telefono: '', sucursal_id: null as number | null };
 
   readonly rolLabel: Record<string, string> = {
     tecnico: 'Mecánico', recepcion: 'Recepcionista', admin: 'Administración',
@@ -53,11 +54,18 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
     });
   }
 
+  // ¿Las dos contraseñas coinciden? (solo relevante si ya escribió la confirmación)
+  get passCoincide(): boolean {
+    return this.nuevo.password === this.nuevo.password2;
+  }
+
   get valido(): boolean {
-    return !!(this.nuevo.nombre.trim() && this.nuevo.email.trim() && this.nuevo.password && this.nuevo.rol);
+    return !!(this.nuevo.nombre.trim() && this.nuevo.email.trim() &&
+      this.nuevo.password && this.nuevo.password2 && this.passCoincide && this.nuevo.rol);
   }
 
   crear() {
+    if (this.nuevo.password && !this.passCoincide) { this.aviso('Las contraseñas no coinciden', 'warning'); return; }
     if (!this.valido) { this.aviso('Completá nombre, email, contraseña y rol', 'warning'); return; }
     this.creando = true;
     this.svc.create({
@@ -70,7 +78,7 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.creando = false;
-        this.nuevo = { nombre: '', email: '', password: '', rol: 'tecnico', telefono: '', sucursal_id: null };
+        this.nuevo = { nombre: '', email: '', password: '', password2: '', rol: 'tecnico', telefono: '', sucursal_id: null };
         this.cargar();
         this.aviso('Empleado creado');
       },
