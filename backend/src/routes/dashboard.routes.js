@@ -43,8 +43,20 @@ router.get('/resumen', async (req, res) => {
     const [[{ repuestos_pendientes }]] = await pool.query(
       "SELECT COUNT(*) AS repuestos_pendientes FROM orden_repuestos r JOIN ordenes_trabajo o ON o.id = r.orden_id WHERE r.estado IN ('pendiente','pedido_especial') AND o.estado NOT IN ('entregada','cancelada')"
     );
+    // Satisfacción: el cliente califica sobre todo en la CITA (citas.calificacion),
+    // no en la orden. Unimos citas + órdenes sin doble conteo (una orden ligada a una
+    // cita cuenta solo por la cita), igual que el feed de opiniones. Antes solo miraba
+    // ordenes_trabajo y por eso el KPI salía vacío ("—").
     const [[satisfaccion]] = await pool.query(
-      'SELECT ROUND(AVG(calificacion), 1) AS promedio, COUNT(calificacion) AS total FROM ordenes_trabajo WHERE calificacion IS NOT NULL'
+      `SELECT ROUND(AVG(calificacion), 1) AS promedio, COUNT(calificacion) AS total
+       FROM (
+         SELECT c.calificacion FROM citas c
+           WHERE c.calificacion IS NOT NULL AND c.calificacion > 0
+         UNION ALL
+         SELECT o.calificacion FROM ordenes_trabajo o
+           WHERE o.calificacion IS NOT NULL AND o.calificacion > 0
+             AND o.id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)
+       ) x`
     );
     const [[conversion]] = await pool.query(
       `SELECT

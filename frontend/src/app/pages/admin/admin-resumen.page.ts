@@ -256,6 +256,7 @@ export class AdminResumenPage implements OnInit, OnDestroy {
           <div class="kpi"><div class="num">${formatMoneda(o.facturacion_mes || 0)}</div><div class="label">Facturado mes</div></div>
           <div class="kpi"><div class="num">${formatMoneda(o.ticket_promedio || 0)}</div><div class="label">Ticket promedio</div></div>
           <div class="kpi amber"><div class="num">${o.tiempo_promedio_horas || '—'}h</div><div class="label">Tiempo prom. reparación</div></div>
+          <div class="kpi green"><div class="num">${o.satisfaccion_promedio ? o.satisfaccion_promedio + '★' : '—'}</div><div class="label">Satisfacción${o.satisfaccion_total ? ' (' + o.satisfaccion_total + ')' : ''}</div></div>
         </div>
       </div>` : '';
 
