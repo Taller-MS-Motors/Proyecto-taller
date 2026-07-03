@@ -114,6 +114,42 @@
       </div>
     </div>
 
+    <!-- Opiniones recientes (reseñas reales del cliente) -->
+    <div class="cd mb">
+      <div class="op-head">
+        <span class="cd-title"><ion-icon name="chatbox-ellipses-outline"></ion-icon> Opiniones recientes</span>
+        <div class="op-resumen" *ngIf="opResumen?.total">
+          <span class="op-prom mono">{{ opResumen?.promedio }}<ion-icon name="star"></ion-icon></span>
+          <span class="op-total">{{ opResumen?.total }} reseña{{ opResumen?.total === 1 ? '' : 's' }}</span>
+          <span class="bg bg-rd" *ngIf="opResumen?.bajas">{{ opResumen?.bajas }} baja{{ opResumen?.bajas === 1 ? '' : 's' }}</span>
+        </div>
+      </div>
+
+      <div class="op-row" *ngFor="let o of opinionesOrdenadas"
+           [class.op-baja]="esBaja(o.calificacion)"
+           [class.op-clickable]="o.orden_id" (click)="abrirOpinion(o)">
+        <div class="op-main">
+          <div class="op-stars">
+            <ion-icon *ngFor="let n of estrellas" [name]="n <= o.calificacion ? 'star' : 'star-outline'"
+                      [class.on]="n <= o.calificacion"></ion-icon>
+          </div>
+          <div class="op-cliente">{{ o.cliente_nombre }} {{ o.cliente_apellido }}</div>
+          <p class="op-comentario" *ngIf="o.comentario">"{{ o.comentario }}"</p>
+          <p class="op-comentario op-sincom" *ngIf="!o.comentario">Sin comentario</p>
+        </div>
+        <div class="op-meta">
+          <span class="op-moto" *ngIf="o.marca">{{ o.marca }} {{ o.modelo }}</span>
+          <span class="mono op-orden" *ngIf="o.numero_orden">{{ o.numero_orden }}</span>
+          <span class="op-fecha">{{ fechaCortaOp(o.fecha) }}<ng-container *ngIf="o.tecnico_nombre"> · {{ o.tecnico_nombre }}</ng-container></span>
+        </div>
+      </div>
+
+      <div class="empty" *ngIf="!opiniones.length">
+        <ion-icon name="chatbox-ellipses-outline"></ion-icon>
+        <p>Todavía no hay calificaciones de clientes.</p>
+      </div>
+    </div>
+
     <!-- Top servicios | Estado de citas -->
     <div class="g21">
       <div class="cd">

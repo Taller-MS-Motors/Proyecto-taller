@@ -24,6 +24,11 @@ export class AdminService {
     return this.http.get<{ data: any[] }>(this.citasUrl, { params });
   }
 
+  // Opiniones reales del cliente (feed de reseñas: estrellas + comentario).
+  getOpiniones(): Observable<{ data: { opiniones: any[]; resumen: { total: number; promedio: number; bajas: number } } }> {
+    return this.http.get<{ data: any }>(`${this.url}/opiniones`);
+  }
+
   // Reportes analíticos por período (KPIs, serie, ingresos por servicio, rendimiento).
   getReportes(filtros: { periodo?: string; empleado?: number | null } = {}): Observable<{ data: any }> {
     const params: any = {};

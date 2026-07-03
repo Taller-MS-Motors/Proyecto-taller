@@ -346,6 +346,21 @@
       <p *ngIf="orden.observaciones_finales" class="obs"><span class="k">Observaciones</span>{{ orden.observaciones_finales }}</p>
     </section>
 
+    <!-- Calificación del cliente (solo recepción/admin, cuando ya calificó) -->
+    <section class="card califa-card" *ngIf="orden.estado === 'entregada' && orden.calificacion && !auth.tieneRol('tecnico')">
+      <span class="section-label">
+        <ion-icon name="star-outline" style="vertical-align:-2px;margin-right:4px;color:var(--amber-500)"></ion-icon>
+        Calificación del cliente
+      </span>
+      <div class="califa-stars">
+        <ion-icon *ngFor="let n of estrellas" [name]="n <= orden.calificacion! ? 'star' : 'star-outline'"
+                  [class.on]="n <= orden.calificacion!"></ion-icon>
+        <span class="califa-num mono">{{ orden.calificacion }}/5</span>
+      </div>
+      <p class="califa-com" *ngIf="orden.comentario_satisfaccion">"{{ orden.comentario_satisfaccion }}"</p>
+      <p class="califa-com califa-sincom" *ngIf="!orden.comentario_satisfaccion">El cliente no dejó comentario.</p>
+    </section>
+
     <!-- Garantía y reclamos (solo recepción/admin) -->
     <section class="card" *ngIf="orden.estado === 'entregada' && !auth.tieneRol('tecnico')">
       <span class="section-label">

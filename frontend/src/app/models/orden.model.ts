@@ -34,6 +34,8 @@ export interface Orden {
   metodo_pago?: string | null;
   garantia_dias?: number;
   observaciones_finales?: string | null;
+  calificacion?: number | null;
+  comentario_satisfaccion?: string | null;
   sucursal_id?: number | null;
   // Campos enriquecidos del JOIN
   anio?: number | null;

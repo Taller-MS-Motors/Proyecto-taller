@@ -167,6 +167,112 @@
   flex-wrap: wrap;
 }
 
+// ——— Opiniones (reseñas del cliente) ———
+.op-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.op-resumen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.op-prom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--am);
+  ion-icon { font-size: 14px; }
+}
+
+.op-total {
+  font-size: 12px;
+  color: var(--tx3);
+}
+
+.op-row {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--bd2);
+
+  &:last-of-type { border-bottom: 0; }
+}
+
+.op-clickable { cursor: pointer; }
+
+// Reseña baja (1-2★): franja carmesí para que salte a la vista.
+.op-baja {
+  background: rgba(225, 29, 72, .08);
+  border-left: 3px solid var(--cr);
+  border-radius: 8px;
+  padding-left: 10px;
+  padding-right: 10px;
+  margin: 4px 0;
+}
+
+.op-main { min-width: 0; flex: 1; }
+
+.op-stars {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 5px;
+  ion-icon { font-size: 14px; color: var(--tx3); }
+  ion-icon.on { color: var(--am); }
+}
+
+.op-cliente {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.op-comentario {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: var(--tx2);
+  line-height: 1.4;
+}
+
+.op-sincom {
+  color: var(--tx3);
+  font-style: italic;
+}
+
+.op-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 2px;
+  flex-shrink: 0;
+  max-width: 42%;
+}
+
+.op-moto {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tx2);
+}
+
+.op-orden {
+  font-size: 11px;
+  color: var(--tx3);
+}
+
+.op-fecha {
+  font-size: 11px;
+  color: var(--tx3);
+}
+
 // ——— Skeleton loader for admin resumen ———
 .admin-skeleton {
   max-width: 1120px;

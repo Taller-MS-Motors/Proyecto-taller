@@ -25,8 +25,12 @@ export class AdminResumenPage implements OnInit, OnDestroy {
   tiempos: any[] = [];     // tiempo por etapa
   tecnicos: any[] = [];    // productividad por técnico
   atrasos: any[] = [];     // semáforo de entregas
+  opiniones: any[] = [];   // feed de calificaciones reales del cliente
+  opResumen: { total: number; promedio: number; bajas: number } | null = null;
   cargando = true;
   exportando = false;
+
+  readonly estrellas = [1, 2, 3, 4, 5];
 
   filtroSemaforo: Sem = 'rojo';
 
@@ -66,7 +70,21 @@ export class AdminResumenPage implements OnInit, OnDestroy {
     this.dash.getTiempos().pipe(takeUntil(this.destroy$)).subscribe({ next: r => this.tiempos = r.data, error: () => {} });
     this.dash.getTecnicos().pipe(takeUntil(this.destroy$)).subscribe({ next: r => this.tecnicos = r.data, error: () => {} });
     this.dash.getAtrasos().pipe(takeUntil(this.destroy$)).subscribe({ next: r => this.atrasos = r.data, error: () => {} });
+    this.admin.getOpiniones().pipe(takeUntil(this.destroy$)).subscribe({
+      next: r => { this.opiniones = r.data.opiniones || []; this.opResumen = r.data.resumen || null; },
+      error: () => {},
+    });
   }
+
+  // ── Opiniones (reseñas del cliente) ──
+  // Baja = 1-2★: pide atención (se resalta arriba).
+  esBaja(cal: any): boolean { return Number(cal) <= 2; }
+  // Reseñas con las bajas (1-2★) primero para que el dueño actúe; el backend ya las trae por fecha desc.
+  get opinionesOrdenadas(): any[] {
+    return [...this.opiniones].sort((a, b) => (this.esBaja(a.calificacion) ? 0 : 1) - (this.esBaja(b.calificacion) ? 0 : 1));
+  }
+  abrirOpinion(o: any) { if (o?.orden_id) this.router.navigate(['/detalle-orden', o.orden_id]); }
+  fechaCortaOp(f: any): string { return fechaCorta(f); }
 
   // ── Citas (mes) ──
   get maxServicio(): number {

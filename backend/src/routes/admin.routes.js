@@ -68,6 +68,70 @@ router.get('/resumen', async (req, res) => {
   }
 });
 
+// GET /api/admin/opiniones — calificaciones REALES del cliente (feed de reseñas).
+// Une citas + órdenes sin doble conteo (mismo criterio de ingresos: una orden ligada
+// a una cita cuenta solo por la cita). Devuelve las últimas 40 + un resumen global.
+router.get('/opiniones', async (req, res) => {
+  try {
+    const [opiniones] = await pool.query(
+      `SELECT * FROM (
+         SELECT c.id AS ref_id, 'cita' AS origen, c.orden_id, o.numero_orden,
+                c.calificacion, c.comentario_satisfaccion AS comentario,
+                COALESCE(c.fecha_fin, c.fecha) AS fecha,
+                cl.nombre AS cliente_nombre, cl.apellido AS cliente_apellido,
+                m.marca, m.modelo, m.placa,
+                u.nombre AS tecnico_nombre
+         FROM citas c
+           JOIN clientes cl ON cl.id = c.cliente_id
+           LEFT JOIN motos m ON m.id = c.moto_id
+           LEFT JOIN usuarios u ON u.id = c.tecnico_id
+           LEFT JOIN ordenes_trabajo o ON o.id = c.orden_id
+         WHERE c.calificacion IS NOT NULL AND c.calificacion > 0
+         UNION ALL
+         SELECT o.id AS ref_id, 'orden' AS origen, o.id AS orden_id, o.numero_orden,
+                o.calificacion, o.comentario_satisfaccion AS comentario,
+                COALESCE(o.fecha_entrega_real, o.fecha_ingreso) AS fecha,
+                cl.nombre AS cliente_nombre, cl.apellido AS cliente_apellido,
+                m.marca, m.modelo, m.placa,
+                u.nombre AS tecnico_nombre
+         FROM ordenes_trabajo o
+           JOIN clientes cl ON cl.id = o.cliente_id
+           LEFT JOIN motos m ON m.id = o.moto_id
+           LEFT JOIN usuarios u ON u.id = o.tecnico_id
+         WHERE o.calificacion IS NOT NULL AND o.calificacion > 0
+           AND o.id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)
+       ) t
+       ORDER BY t.fecha DESC
+       LIMIT 40`
+    );
+    // Resumen sobre TODAS las calificaciones (no solo las 40 mostradas).
+    const [[agg]] = await pool.query(
+      `SELECT COUNT(*) AS total, COALESCE(AVG(calificacion),0) AS promedio,
+              COALESCE(SUM(calificacion <= 2),0) AS bajas
+       FROM (
+         SELECT c.calificacion FROM citas c
+           WHERE c.calificacion IS NOT NULL AND c.calificacion > 0
+         UNION ALL
+         SELECT o.calificacion FROM ordenes_trabajo o
+           WHERE o.calificacion IS NOT NULL AND o.calificacion > 0
+             AND o.id NOT IN (SELECT orden_id FROM citas WHERE orden_id IS NOT NULL)
+       ) x`
+    );
+    res.json({
+      data: {
+        opiniones,
+        resumen: {
+          total: Number(agg.total),
+          promedio: Number(Number(agg.promedio).toFixed(1)),
+          bajas: Number(agg.bajas),
+        },
+      },
+    });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 // GET /api/admin/reportes?periodo=mes|mes_pasado|anio&empleado=<tecnico_id>
 // Analítica por período: KPIs, serie temporal, ingresos por servicio,
 // rendimiento por mecánico y cotizaciones por recepción.

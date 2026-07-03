@@ -385,6 +385,18 @@
   ion-item { --background: transparent; --padding-start: 0; }
 }
 
+// Calificación del cliente
+.califa-card {
+  .califa-stars {
+    display: flex; align-items: center; gap: 3px; margin: 6px 0 2px;
+    ion-icon { font-size: 22px; color: var(--n-300); }
+    ion-icon.on { color: #f59e0b; }
+  }
+  .califa-num { margin-left: 8px; font-size: 14px; font-weight: 800; color: var(--ion-text-color); }
+  .califa-com { margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: var(--ion-text-color); }
+  .califa-sincom { color: var(--n-500); font-style: italic; }
+}
+
 // Solicitud de repuestos (mecanico)
 .solicitud-row { display: flex; align-items: flex-end; gap: 4px;
   .sol-input { flex: 1; min-width: 0; }

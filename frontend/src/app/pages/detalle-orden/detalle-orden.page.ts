@@ -58,6 +58,8 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
     esperando_repuestos: 55, en_reparacion: 70, lista_entrega: 85, entregada: 100
   };
 
+  readonly estrellas = [1, 2, 3, 4, 5];
+
   get pasoActual(): number {
     return this.flujoOrden.indexOf(this.orden?.estado || 'recepcion');
   }
