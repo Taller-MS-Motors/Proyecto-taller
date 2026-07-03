@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { notificarCambioEstado } = require('../utils/notificaciones');
 const { TRANSICIONES_CITA, transicionPermitida } = require('../utils/transiciones');
+const { LEIDO_POR_MI, VISTO_POR_OTRO, marcarLeidos } = require('../utils/mensajes');
 
 // Panel del mecánico: opera sobre SUS citas asignadas. Accesible a técnico o superior.
 router.use(auth, requireRol('tecnico'));
@@ -175,8 +176,9 @@ router.post('/ordenes/:id/repuestos', async (req, res) => {
     );
     const piezas = `${nombre.trim()} ×${cantidad || 1}`;
     await pool.query(
-      "INSERT INTO mensajes_internos (remitente_id, destino_rol, mensaje, orden_id, tipo) VALUES (?, 'recepcion', ?, ?, 'directo')",
-      [req.usuario.id, `Solicitud de repuesto: ${piezas}`, req.params.id]
+      `INSERT INTO mensajes_internos (remitente_id, destino_rol, mensaje, orden_id, tipo, sucursal_id)
+       VALUES (?, 'recepcion', ?, ?, 'directo', (SELECT sucursal_id FROM usuarios WHERE id = ?))`,
+      [req.usuario.id, `Solicitud de repuesto: ${piezas}`, req.params.id, req.usuario.id]
     );
     res.status(201).json({ data: nuevo, message: 'Repuesto solicitado' });
   } catch (err) {
@@ -249,11 +251,13 @@ router.delete('/tareas/:id', async (req, res) => {
 // ───────────────────────────────────────────────────────────
 // Mensajería con recepción
 // ───────────────────────────────────────────────────────────
+// El fragmento LEIDO_POR_MI trae un `?` (mi id): va SIEMPRE como primer parámetro.
 const SELECT_MENSAJE = `
-  SELECT m.id, m.mensaje, m.foto, m.orden_id, m.tipo, m.leido, m.created_at,
+  SELECT m.id, m.mensaje, m.foto, m.orden_id, m.tipo, m.created_at,
          m.remitente_id, m.destino_rol, m.destino_id,
          u.nombre AS remitente_nombre, u.rol AS remitente_rol,
-         o.numero_orden
+         o.numero_orden,
+         ${LEIDO_POR_MI}, ${VISTO_POR_OTRO}
   FROM mensajes_internos m
   JOIN usuarios u ON u.id = m.remitente_id
   LEFT JOIN ordenes_trabajo o ON o.id = m.orden_id`;
@@ -263,14 +267,11 @@ router.get('/mensajes', async (req, res) => {
     const yo = req.usuario.id;
     const [rows] = await pool.query(
       `${SELECT_MENSAJE}
-       WHERE m.remitente_id = ? OR m.destino_id = ? OR m.tipo = 'broadcast'
+       WHERE m.remitente_id = ? OR m.destino_id = ? OR (m.tipo = 'broadcast' AND m.destino_rol = 'tecnico')
        ORDER BY m.created_at ASC LIMIT 100`,
-      [yo, yo]
+      [yo, yo, yo]
     );
-    await pool.query(
-      "UPDATE mensajes_internos SET leido = 1 WHERE (destino_id = ? OR (tipo = 'broadcast' AND destino_rol = 'tecnico')) AND leido = 0",
-      [yo]
-    );
+    await marcarLeidos(yo, rows);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -281,8 +282,11 @@ router.get('/mensajes/no-leidos', async (req, res) => {
   try {
     const yo = req.usuario.id;
     const [[{ count }]] = await pool.query(
-      "SELECT COUNT(*) AS count FROM mensajes_internos WHERE ((destino_id = ?) OR (tipo = 'broadcast' AND destino_rol = 'tecnico')) AND leido = 0",
-      [yo]
+      `SELECT COUNT(*) AS count FROM mensajes_internos m
+       WHERE (m.destino_id = ? OR (m.tipo = 'broadcast' AND m.destino_rol = 'tecnico'))
+         AND m.remitente_id <> ?
+         AND NOT EXISTS(SELECT 1 FROM mensaje_lecturas ml WHERE ml.mensaje_id = m.id AND ml.usuario_id = ?)`,
+      [yo, yo, yo]
     );
     res.json({ data: { count } });
   } catch (err) {
@@ -292,13 +296,16 @@ router.get('/mensajes/no-leidos', async (req, res) => {
 
 router.post('/mensajes', async (req, res) => {
   try {
-    const { mensaje, foto, orden_id } = req.body;
+    const { mensaje, foto, orden_id, destino } = req.body;
     if ((!mensaje || !mensaje.trim()) && !foto) return res.status(400).json({ error: 'El mensaje o una foto es requerido' });
+    // El mecánico elige a quién escribe: recepción (default) o admin.
+    const destino_rol = destino === 'admin' ? 'admin' : 'recepcion';
+    const [[me]] = await pool.query('SELECT sucursal_id FROM usuarios WHERE id = ?', [req.usuario.id]);
     const [r] = await pool.query(
-      "INSERT INTO mensajes_internos (remitente_id, destino_rol, mensaje, foto, orden_id) VALUES (?, 'recepcion', ?, ?, ?)",
-      [req.usuario.id, (mensaje || '').trim(), foto || null, orden_id || null]
+      "INSERT INTO mensajes_internos (remitente_id, destino_rol, mensaje, foto, orden_id, sucursal_id, tipo) VALUES (?, ?, ?, ?, ?, ?, 'directo')",
+      [req.usuario.id, destino_rol, (mensaje || '').trim(), foto || null, orden_id || null, me?.sucursal_id || null]
     );
-    const [[nuevo]] = await pool.query(`${SELECT_MENSAJE} WHERE m.id = ?`, [r.insertId]);
+    const [[nuevo]] = await pool.query(`${SELECT_MENSAJE} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Mensaje enviado' });
   } catch (err) {
     fail(res, err);

@@ -68,7 +68,7 @@
               {{ esMio(m) ? 'Vos' : m.remitente_nombre }}
               <span *ngIf="m.tipo === 'broadcast'" class="broadcast-tag">· a todos</span>
               · {{ horaExacta(m.created_at) }}
-              <ion-icon *ngIf="esMio(m)" [name]="m.leido ? 'checkmark-done' : 'checkmark'" [class.read]="m.leido" class="read-icon"></ion-icon>
+              <ion-icon *ngIf="esMio(m)" [name]="m.visto ? 'checkmark-done' : 'checkmark'" [class.read]="m.visto" class="read-icon"></ion-icon>
             </span>
           </div>
         </div>
@@ -97,6 +97,15 @@
   <!-- Barra de envío fija -->
   <div class="quick-send chat">
     <div class="qs-inner">
+      <div class="dest-row">
+        <span class="dest-lbl">Para:</span>
+        <button class="dest-chip" [class.on]="destino === 'recepcion'" (click)="destino = 'recepcion'">
+          <ion-icon name="people-outline"></ion-icon> Recepción
+        </button>
+        <button class="dest-chip" [class.on]="destino === 'admin'" (click)="destino = 'admin'">
+          <ion-icon name="shield-outline"></ion-icon> Admin
+        </button>
+      </div>
       <div class="qs-row">
         <button class="qs-attach" (click)="adjuntarFoto()" title="Adjuntar foto">
           <ion-icon name="camera-outline"></ion-icon>
@@ -104,7 +113,7 @@
         <button class="qs-attach" (click)="mostrarRapidas = !mostrarRapidas" [class.active]="mostrarRapidas" title="Respuestas rápidas">
           <ion-icon name="flash-outline"></ion-icon>
         </button>
-        <input type="text" [(ngModel)]="texto" placeholder="Escribí a recepción…" class="qs-msg" (keyup.enter)="enviar()" />
+        <input type="text" [(ngModel)]="texto" [placeholder]="destino === 'admin' ? 'Escribí a administración…' : 'Escribí a recepción…'" class="qs-msg" (keyup.enter)="enviar()" />
         <button class="qs-send" (click)="enviar()" [disabled]="enviando || (!texto.trim() && !fotoPreview)">
           <ion-icon name="send"></ion-icon>
         </button>

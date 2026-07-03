@@ -22,6 +22,7 @@ export class MecanicoContactoPage implements OnInit, OnDestroy {
   cargando = true;
   texto = '';
   enviando = false;
+  destino: 'recepcion' | 'admin' = 'recepcion';   // a quién le escribo
   miId = this.auth.getUsuario()?.id;
   fotoPreview: string | null = null;
   mostrarRapidas = false;
@@ -76,7 +77,7 @@ export class MecanicoContactoPage implements OnInit, OnDestroy {
     if (!txt && !foto) return;
     this.enviando = true;
     this.mostrarRapidas = false;
-    this.mecanico.enviarMensaje(txt, foto).pipe(takeUntil(this.destroy$)).subscribe({
+    this.mecanico.enviarMensaje(txt, foto, null, this.destino).pipe(takeUntil(this.destroy$)).subscribe({
       next: r => {
         this.mensajes.push(r.data);
         this.texto = '';

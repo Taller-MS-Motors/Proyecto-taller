@@ -389,6 +389,20 @@ async function ensureSchema() {
     await addColumnIfMissing('mensajes_internos', 'orden_id', 'INT NULL');
     await addColumnIfMissing('mensajes_internos', 'tipo', "VARCHAR(20) NOT NULL DEFAULT 'directo'");
 
+    // Mensajería interna v3: sucursal (para filtrar por sede) y lectura POR USUARIO.
+    // Antes `leido` era global por mensaje: al abrir la bandeja se marcaba leído para
+    // todo el rol, así que el badge de "no leído" no era confiable entre personas.
+    await addColumnIfMissing('mensajes_internos', 'sucursal_id', 'INT NULL');
+    await crearIndiceSiFalta('mensajes_internos', 'idx_msg_sucursal', '(sucursal_id)');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS mensaje_lecturas (
+        mensaje_id INT NOT NULL,
+        usuario_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (mensaje_id, usuario_id),
+        INDEX idx_ml_usuario (usuario_id)
+      )`);
+
     // FK constraints en columnas agregadas por addColumnIfMissing (integridad referencial).
     await tryStep('fk citas.tecnico_id', () => addFkIfMissing('citas', 'fk_citas_tecnico', 'tecnico_id', 'usuarios', 'id'));
     await tryStep('fk citas.orden_id', () => addFkIfMissing('citas', 'fk_citas_orden', 'orden_id', 'ordenes_trabajo', 'id'));

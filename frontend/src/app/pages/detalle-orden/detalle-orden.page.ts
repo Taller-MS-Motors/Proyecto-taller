@@ -105,6 +105,12 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
   mostrarFormReclamo = false;
   nuevoReclamo = { descripcion_problema: '', cubre_repuestos: false, cubre_mano_obra: false };
 
+  // Mensajes internos sobre esta orden (contexto de orden).
+  mensajes: any[] = [];
+  nuevoMensaje = '';
+  enviandoMensaje = false;
+  miId = this.auth.getUsuario()?.id ?? null;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -139,6 +145,7 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
       this.ordenSvc.getTiempos(id).pipe(takeUntil(this.destroy$)).subscribe(res => this.tiempos = res.data || []);
     }
     this.garantiaSvc.getAll({ orden_id: id }).pipe(takeUntil(this.destroy$)).subscribe(res => this.garantias = res.data);
+    this.cargarMensajes(id);
     this.ordenSvc.getChecklist(id).pipe(takeUntil(this.destroy$)).subscribe(res => {
       if (res.data) {
         this.checklist = {
@@ -164,6 +171,25 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
     } else if (this.auth.tieneRol('recepcion')) {
       this.rec.getTecnicos(this.orden?.sucursal_id).pipe(takeUntil(this.destroy$)).subscribe(res => { this.tecnicos = res.data; });
     }
+  }
+
+  // ── Mensajes de la orden (contexto de orden) ──
+  cargarMensajes(id: number) {
+    this.ordenSvc.getMensajes(id).pipe(takeUntil(this.destroy$)).subscribe({ next: r => this.mensajes = r.data || [], error: () => {} });
+  }
+  esMensajeMio(m: any): boolean { return m.remitente_id === this.miId; }
+  async enviarMensaje() {
+    const txt = this.nuevoMensaje.trim();
+    if (!txt || !this.orden?.id || this.enviandoMensaje) return;
+    this.enviandoMensaje = true;
+    this.ordenSvc.enviarMensaje(this.orden.id, txt).pipe(takeUntil(this.destroy$)).subscribe({
+      next: r => { if (r?.data) this.mensajes.push(r.data); this.nuevoMensaje = ''; this.enviandoMensaje = false; },
+      error: async (e) => {
+        this.enviandoMensaje = false;
+        const t = await this.toast.create({ message: e?.error?.error || 'No se pudo enviar', duration: 2200, color: 'danger' });
+        await t.present();
+      },
+    });
   }
 
   estadoLabel(e: string) { return ESTADO_CONFIG[e as EstadoOrden]?.label ?? e; }

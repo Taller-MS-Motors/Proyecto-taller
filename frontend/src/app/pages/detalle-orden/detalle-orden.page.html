@@ -264,6 +264,34 @@
       <p *ngIf="avances.length === 0" class="empty-row">Sin avances registrados</p>
     </section>
 
+    <!-- Mensajes de la orden (recepción/admin ↔ mecánico) -->
+    <section class="card msg-card">
+      <span class="section-label">
+        <ion-icon name="chatbubbles-outline" style="vertical-align:-2px;margin-right:4px"></ion-icon>
+        Mensajes de la orden
+      </span>
+      <div class="msg-thread" *ngIf="mensajes.length">
+        <div class="msg-row" *ngFor="let m of mensajes" [class.mio]="esMensajeMio(m)">
+          <div class="msg-bubble">
+            <img *ngIf="m.foto" [src]="m.foto" class="msg-img" alt="Foto adjunta" />
+            <p *ngIf="m.mensaje">{{ m.mensaje }}</p>
+            <span class="msg-meta">
+              {{ esMensajeMio(m) ? 'Vos' : m.remitente_nombre }}
+              <span class="msg-rol">· {{ m.remitente_rol === 'tecnico' ? 'Mecánico' : m.remitente_rol === 'admin' ? 'Admin' : 'Recepción' }}</span>
+              · {{ m.created_at | date:'dd/MM HH:mm' }}
+            </span>
+          </div>
+        </div>
+      </div>
+      <p *ngIf="!mensajes.length" class="empty-row">Sin mensajes sobre esta orden todavía</p>
+      <div class="msg-send">
+        <input type="text" [(ngModel)]="nuevoMensaje" placeholder="Escribí un mensaje…" (keyup.enter)="enviarMensaje()" />
+        <button (click)="enviarMensaje()" [disabled]="enviandoMensaje || !nuevoMensaje.trim()" aria-label="Enviar">
+          <ion-icon name="send"></ion-icon>
+        </button>
+      </div>
+    </section>
+
     <!-- Checklist de entrega -->
     <section class="card" *ngIf="orden.estado === 'lista_entrega' || orden.estado === 'entregada'">
       <span class="section-label">

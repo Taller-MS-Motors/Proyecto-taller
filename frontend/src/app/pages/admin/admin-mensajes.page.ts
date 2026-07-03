@@ -1,4 +1,5 @@
 import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { Router } from '@angular/router';
 import { AlertController, IonContent, ToastController } from '@ionic/angular';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -31,7 +32,9 @@ export class AdminMensajesPage implements OnInit, OnDestroy {
   broadcastTexto = '';
   enviandoBroadcast = false;
 
-  constructor(private rec: RecepcionService, private toast: ToastController, private alert: AlertController) {}
+  constructor(private rec: RecepcionService, private toast: ToastController, private alert: AlertController, private router: Router) {}
+
+  abrirOrden(ordenId: number) { if (ordenId) this.router.navigate(['/detalle-orden', ordenId]); }
 
   ngOnInit() {
     this.cargar();

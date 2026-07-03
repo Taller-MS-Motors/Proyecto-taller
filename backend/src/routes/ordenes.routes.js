@@ -6,6 +6,7 @@ const requireRol = require('../middleware/roles');
 const { generarNumeroOrden, sincronizarCitaDesdeOrden, cerrarOrden } = require('../utils/ordenes');
 const { TRANSICIONES_ORDEN, transicionPermitida } = require('../utils/transiciones');
 const { sucursalValida } = require('../utils/sucursales');
+const { LEIDO_POR_MI, VISTO_POR_OTRO, marcarLeidos } = require('../utils/mensajes');
 
 // Piso de rol: recepción o superior (recepción crea órdenes, el técnico las trabaja).
 // Sin esto, cualquier token válido podía leer/alterar órdenes ajenas y sus costos.
@@ -420,6 +421,64 @@ router.delete('/:id/fotos/:fid', requireRol('admin'), async (req, res) => {
     const [result] = await pool.query('DELETE FROM orden_fotos WHERE id = ? AND orden_id = ?', [req.params.fid, req.params.id]);
     if (!result.affectedRows) return res.status(404).json({ error: 'Foto no encontrada' });
     res.json({ message: 'Foto eliminada' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// ───────────────────────────────────────────────────────────
+// Mensajes internos vinculados a ESTA orden (contexto de orden).
+// Recepción/admin ↔ el mecánico asignado hablan sobre la orden desde su detalle.
+// ───────────────────────────────────────────────────────────
+const SELECT_MSG_ORDEN = `
+  SELECT m.id, m.mensaje, m.foto, m.orden_id, m.tipo, m.created_at,
+         m.remitente_id, m.destino_rol, m.destino_id,
+         ru.nombre AS remitente_nombre, ru.rol AS remitente_rol,
+         du.nombre AS destino_nombre,
+         ${LEIDO_POR_MI}, ${VISTO_POR_OTRO}
+  FROM mensajes_internos m
+  JOIN usuarios ru ON ru.id = m.remitente_id
+  LEFT JOIN usuarios du ON du.id = m.destino_id`;
+
+// GET /api/ordenes/:id/mensajes — hilo de la orden (marca leídos los míos).
+router.get('/:id/mensajes', async (req, res) => {
+  try {
+    const yo = req.usuario.id;
+    const [rows] = await pool.query(
+      `${SELECT_MSG_ORDEN} WHERE m.orden_id = ? ORDER BY m.created_at ASC LIMIT 100`,
+      [yo, req.params.id]
+    );
+    await marcarLeidos(yo, rows);
+    res.json({ data: rows });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/ordenes/:id/mensajes — enviar un mensaje sobre la orden.
+// Mecánico → recepción; recepción/admin → el mecánico asignado.
+router.post('/:id/mensajes', async (req, res) => {
+  try {
+    const { mensaje, foto } = req.body;
+    if ((!mensaje || !mensaje.trim()) && !foto) return res.status(400).json({ error: 'El mensaje o una foto es requerido' });
+    const [[orden]] = await pool.query('SELECT id, tecnico_id, sucursal_id FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
+    if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
+
+    let destino_rol = null, destino_id = null;
+    if (req.usuario.rol === 'tecnico') {
+      destino_rol = 'recepcion';
+    } else if (orden.tecnico_id) {
+      destino_id = orden.tecnico_id;
+    } else {
+      return res.status(400).json({ error: 'Asigná un mecánico a la orden para enviarle un mensaje' });
+    }
+    const [r] = await pool.query(
+      `INSERT INTO mensajes_internos (remitente_id, destino_rol, destino_id, mensaje, foto, orden_id, sucursal_id, tipo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'directo')`,
+      [req.usuario.id, destino_rol, destino_id, (mensaje || '').trim(), foto || null, orden.id, orden.sucursal_id || null]
+    );
+    const [[nuevo]] = await pool.query(`${SELECT_MSG_ORDEN} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
+    res.status(201).json({ data: nuevo, message: 'Mensaje enviado' });
   } catch (err) {
     fail(res, err);
   }

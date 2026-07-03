@@ -118,6 +118,10 @@
             <div class="day-sep" *ngIf="mostrarSeparador(hilo, i)"><span>{{ etiquetaDia(m.created_at) }}</span></div>
             <div class="bubble-row" [class.mio]="esMio(m)">
               <div class="bubble">
+                <a class="bubble-order" *ngIf="m.orden_id" (click)="abrirOrden(m.orden_id)"
+                   style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--cr);cursor:pointer;margin-bottom:4px">
+                  <ion-icon name="document-text-outline" style="font-size:13px"></ion-icon> {{ m.numero_orden || 'Orden' }}
+                </a>
                 <img *ngIf="m.foto" [src]="m.foto" class="bubble-img" alt="Foto" />
                 <p *ngIf="m.mensaje">{{ m.mensaje }}</p>
                 <span class="b-time">{{ horaExacta(m.created_at) }}</span>

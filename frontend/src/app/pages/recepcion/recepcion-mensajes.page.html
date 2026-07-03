@@ -142,14 +142,15 @@
             </div>
             <div class="bubble-row" [class.mio]="esMio(m)">
               <div class="bubble">
-                <div class="bubble-order" *ngIf="m.numero_orden">
+                <div class="bubble-order" *ngIf="m.numero_orden" (click)="abrirOrden(m.orden_id)"
+                     [style.cursor]="m.orden_id ? 'pointer' : 'default'">
                   <ion-icon name="document-text-outline"></ion-icon> {{ m.numero_orden }}
                 </div>
                 <img *ngIf="m.foto" [src]="m.foto" class="bubble-img" alt="Foto" />
                 <p *ngIf="m.mensaje">{{ m.mensaje }}</p>
                 <span class="b-time">
                   {{ horaExacta(m.created_at) }}
-                  <ion-icon *ngIf="esMio(m)" [name]="m.leido ? 'checkmark-done' : 'checkmark'" [class.read]="m.leido" class="read-icon"></ion-icon>
+                  <ion-icon *ngIf="esMio(m)" [name]="m.visto ? 'checkmark-done' : 'checkmark'" [class.read]="m.visto" class="read-icon"></ion-icon>
                 </span>
               </div>
             </div>

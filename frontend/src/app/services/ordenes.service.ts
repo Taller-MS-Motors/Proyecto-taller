@@ -84,4 +84,13 @@ export class OrdenesService {
   deleteFoto(ordenId: number, fotoId: number): Observable<any> {
     return this.http.delete(`${this.url}/${ordenId}/fotos/${fotoId}`);
   }
+
+  // Mensajes internos vinculados a la orden (contexto de orden).
+  getMensajes(id: number): Observable<{ data: any[] }> {
+    return this.http.get<{ data: any[] }>(`${this.url}/${id}/mensajes`);
+  }
+
+  enviarMensaje(id: number, mensaje: string, foto?: string | null): Observable<{ data: any }> {
+    return this.http.post<{ data: any }>(`${this.url}/${id}/mensajes`, { mensaje, foto: foto || null });
+  }
 }

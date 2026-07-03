@@ -9,6 +9,7 @@ const { getConfig, horasDisponibles } = require('../utils/configuracion');
 const { SERVICIOS } = require('../utils/servicios');
 const { getSucursales, tecnicoEnSucursal } = require('../utils/sucursales');
 const { notificarMecanico } = require('../utils/notificaciones');
+const { LEIDO_POR_MI, VISTO_POR_OTRO, marcarLeidos } = require('../utils/mensajes');
 
 // Panel de recepción: intermediaria entre cliente y mecánico.
 // Accesible a recepción y superiores.
@@ -877,24 +878,41 @@ router.post('/notificar', async (req, res) => {
 // ───────────────────────────────────────────────────────────
 // Mensajería interna con los mecánicos (lado recepción)
 // ───────────────────────────────────────────────────────────
+// LEIDO_POR_MI trae un `?` (mi id): va SIEMPRE como primer parámetro de cada query.
 const SELECT_MSG_INT = `
-  SELECT m.id, m.mensaje, m.foto, m.orden_id, m.tipo, m.created_at, m.leido,
-         m.remitente_id, m.destino_rol, m.destino_id,
+  SELECT m.id, m.mensaje, m.foto, m.orden_id, m.tipo, m.created_at,
+         m.remitente_id, m.destino_rol, m.destino_id, m.sucursal_id,
          ru.nombre AS remitente_nombre, ru.rol AS remitente_rol, ru.sucursal_id AS remitente_sucursal_id,
          du.nombre AS destino_nombre, du.sucursal_id AS destino_sucursal_id,
          o.numero_orden,
-         COALESCE(sr.nombre, sd.nombre) AS sucursal_nombre
+         COALESCE(sm.nombre, sr.nombre, sd.nombre) AS sucursal_nombre,
+         ${LEIDO_POR_MI}, ${VISTO_POR_OTRO}
   FROM mensajes_internos m
   JOIN usuarios ru ON ru.id = m.remitente_id
   LEFT JOIN usuarios du ON du.id = m.destino_id
   LEFT JOIN ordenes_trabajo o ON o.id = m.orden_id
+  LEFT JOIN sucursales sm ON sm.id = m.sucursal_id
   LEFT JOIN sucursales sr ON sr.id = ru.sucursal_id
   LEFT JOIN sucursales sd ON sd.id = du.sucursal_id`;
 
+// Bandeja de la oficina, separada por rol del que consulta:
+//  · admin ve el bolsón 'admin' (lo que los mecánicos le mandan a admin + sus hilos)
+//  · recepción ve el bolsón 'recepcion', filtrado por su sucursal
+// "Lado oficina" de un mensaje = el rol del remitente si es oficina; si lo mandó un
+// mecánico, el bolsón al que escribió (destino_rol).
 router.get('/mensajes-internos', async (req, res) => {
   try {
-    const [rows] = await pool.query(`${SELECT_MSG_INT} ORDER BY m.created_at DESC LIMIT 100`);
-    await pool.query("UPDATE mensajes_internos SET leido = 1 WHERE destino_rol = 'recepcion' AND leido = 0");
+    const yo = req.usuario.id;
+    const [[me]] = await pool.query('SELECT rol, sucursal_id FROM usuarios WHERE id = ?', [yo]);
+    const rol = me.rol === 'admin' ? 'admin' : 'recepcion';
+    const params = [yo, rol, rol];
+    let where = `WHERE ( (ru.rol = 'tecnico' AND m.destino_rol = ? AND m.tipo <> 'broadcast') OR ru.rol = ? )`;
+    if (rol === 'recepcion' && me.sucursal_id) {
+      where += ' AND (m.sucursal_id = ? OR m.sucursal_id IS NULL)';
+      params.push(me.sucursal_id);
+    }
+    const [rows] = await pool.query(`${SELECT_MSG_INT} ${where} ORDER BY m.created_at DESC LIMIT 100`, params);
+    await marcarLeidos(yo, rows);
     res.json({ data: rows });
   } catch (err) {
     fail(res, err);
@@ -903,8 +921,21 @@ router.get('/mensajes-internos', async (req, res) => {
 
 router.get('/mensajes-internos/no-leidos', async (req, res) => {
   try {
+    const yo = req.usuario.id;
+    const [[me]] = await pool.query('SELECT rol, sucursal_id FROM usuarios WHERE id = ?', [yo]);
+    const rol = me.rol === 'admin' ? 'admin' : 'recepcion';
+    // Solo cuentan los mensajes que un mecánico mandó a mi bolsón y que yo no leí.
+    const params = [rol, yo, yo];
+    let where = `WHERE ru.rol = 'tecnico' AND m.destino_rol = ? AND m.tipo <> 'broadcast'
+                 AND m.remitente_id <> ?
+                 AND NOT EXISTS(SELECT 1 FROM mensaje_lecturas ml WHERE ml.mensaje_id = m.id AND ml.usuario_id = ?)`;
+    if (rol === 'recepcion' && me.sucursal_id) {
+      where += ' AND (m.sucursal_id = ? OR m.sucursal_id IS NULL)';
+      params.push(me.sucursal_id);
+    }
     const [[{ count }]] = await pool.query(
-      "SELECT COUNT(*) AS count FROM mensajes_internos WHERE destino_rol = 'recepcion' AND leido = 0"
+      `SELECT COUNT(*) AS count FROM mensajes_internos m JOIN usuarios ru ON ru.id = m.remitente_id ${where}`,
+      params
     );
     res.json({ data: { count } });
   } catch (err) {
@@ -918,11 +949,13 @@ router.post('/mensajes-internos', async (req, res) => {
     if (!destino_id || ((!mensaje || !mensaje.trim()) && !foto)) {
       return res.status(400).json({ error: 'Destinatario y mensaje (o foto) son requeridos' });
     }
+    // La sede del mensaje = la del mecánico destinatario (para el filtro por sucursal).
     const [r] = await pool.query(
-      'INSERT INTO mensajes_internos (remitente_id, destino_id, mensaje, foto, orden_id) VALUES (?, ?, ?, ?, ?)',
-      [req.usuario.id, destino_id, (mensaje || '').trim(), foto || null, orden_id || null]
+      `INSERT INTO mensajes_internos (remitente_id, destino_id, mensaje, foto, orden_id, sucursal_id)
+       VALUES (?, ?, ?, ?, ?, (SELECT sucursal_id FROM usuarios WHERE id = ?))`,
+      [req.usuario.id, destino_id, (mensaje || '').trim(), foto || null, orden_id || null, destino_id]
     );
-    const [[nuevo]] = await pool.query(`${SELECT_MSG_INT} WHERE m.id = ?`, [r.insertId]);
+    const [[nuevo]] = await pool.query(`${SELECT_MSG_INT} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Respuesta enviada' });
   } catch (err) {
     fail(res, err);
@@ -939,7 +972,7 @@ router.post('/mensajes-internos/broadcast', async (req, res) => {
       "INSERT INTO mensajes_internos (remitente_id, destino_rol, tipo, mensaje, foto) VALUES (?, 'tecnico', 'broadcast', ?, ?)",
       [req.usuario.id, (mensaje || '').trim(), foto || null]
     );
-    const [[nuevo]] = await pool.query(`${SELECT_MSG_INT} WHERE m.id = ?`, [r.insertId]);
+    const [[nuevo]] = await pool.query(`${SELECT_MSG_INT} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Mensaje enviado a todos los mecánicos' });
   } catch (err) {
     fail(res, err);
