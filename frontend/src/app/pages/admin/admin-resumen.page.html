@@ -33,7 +33,7 @@
     <div class="kpi-grid">
       <div class="kpi cr"><div class="kpi-label">En taller</div><div class="kpi-val">{{ op?.motos_activas ?? 0 }}</div></div>
       <div class="kpi am"><div class="kpi-label">Atrasadas</div><div class="kpi-val">{{ op?.motos_atrasadas ?? 0 }}</div></div>
-      <div class="kpi em"><div class="kpi-label">Facturación del mes</div><div class="kpi-val mono">{{ (op?.facturacion_mes || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</div></div>
+      <div class="kpi em"><div class="kpi-label">Facturación del mes</div><div class="kpi-val mono">{{ (op?.facturacion_mes_total || 0) | currency:'CRC':'symbol-narrow':'1.0-0' }}</div></div>
       <div class="kpi in"><div class="kpi-label">Tasa de éxito</div><div class="kpi-val">{{ data?.tasa_exito ?? 0 }}%</div></div>
     </div>
 
