@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MS Motos</string>
+    <string name="title_activity_main">MS Motos</string>
+    <string name="package_name">cr.msmotos.app</string>
+    <string name="custom_url_scheme">cr.msmotos.app</string>
+</resources>

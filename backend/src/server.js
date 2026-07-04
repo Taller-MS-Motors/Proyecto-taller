@@ -55,9 +55,23 @@ app.use((req, res, next) => {
   next();
 });
 
-if (!hasFrontend) {
-  app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:8100' }));
-}
+// CORS: la app nativa (Capacitor) llama a la API desde un origen distinto
+// (capacitor://localhost en iOS, https://localhost o http://localhost en Android),
+// así que los headers CORS deben enviarse SIEMPRE — antes solo se aplicaban sin
+// frontend embebido y la app instalada quedaba bloqueada por el WebView.
+// La web servida por este mismo server es same-origin y no se ve afectada.
+// CORS_ORIGIN admite orígenes extra separados por coma.
+const ORIGENES_PERMITIDOS = new Set([
+  'capacitor://localhost',  // iOS (WebView de Capacitor)
+  'https://localhost',      // Android (androidScheme https, default de Capacitor)
+  'http://localhost',       // Android (androidScheme http)
+  'http://localhost:8100',  // ionic serve en desarrollo
+  ...(process.env.CORS_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean),
+]);
+app.use(cors({
+  // Sin header Origin (same-origin, curl, healthcheck) se permite sin emitir CORS.
+  origin: (origin, cb) => cb(null, !origin || ORIGENES_PERMITIDOS.has(origin)),
+}));
 
 app.use(express.json({ limit: '10mb' }));
 

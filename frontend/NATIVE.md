@@ -22,36 +22,33 @@ export const NATIVE_API_URL = 'https://proyecto-taller-production-0e4b.up.railwa
 > El `ApiUrlInterceptor` reescribe `/api/...` → `${NATIVE_API_URL}/api/...` **solo en nativo**.
 > En web no cambia nada.
 
-## 2. CORS del backend  ⚠️ obligatorio
-El WebView nativo tiene origen `capacitor://localhost` (iOS) / `http://localhost` (Android).
-En **Railway**, agregá ese origen a la variable `CORS_ORIGIN` del backend (separá con coma si
-hay varios), por ejemplo:
+## 2. CORS del backend  ✅ resuelto en código
+`server.js` permite SIEMPRE los orígenes del WebView nativo (`capacitor://localhost`,
+`https://localhost`, `http://localhost`). La variable `CORS_ORIGIN` en Railway queda solo
+para sumar orígenes extra (separados por coma); ya no es necesaria para la app nativa.
 
-```
-CORS_ORIGIN=https://proyecto-taller-production-0e4b.up.railway.app,capacitor://localhost,http://localhost
-```
+## 3. Plataformas
+- **Android** ✅ ya agregada (`android/`, versionada en git). Para builds: Android Studio + JDK 17.
+- **iOS** ⏳ pendiente — requiere Mac: `npx ng build --configuration production && npx cap add ios && npx cap sync ios`.
 
-## 3. Agregar plataformas
+## 4. Iconos y splash  ✅ Android generado
+Las **fuentes** viven en [`assets/`](assets/): `icon-only.png` (1024, opaco), `icon-foreground.png`
++ `icon-background.png` (icono adaptativo) y `splash.png` / `splash-dark.png` (2732, claro carmesí
+`#e11d48` / oscuro `#111114`). Para regenerar (o generar iOS cuando exista `ios/`):
+
 ```bash
-cd frontend
-npm install            # asegura node_modules
-npx ng build --configuration production   # genera www/
-npx cap add android    # crea android/  (en Mac: npx cap add ios)
-npx cap sync           # copia www/ + plugins a las plataformas
+npx capacitor-assets generate --android   # o --ios en Mac
 ```
 
-## 4. Permisos nativos (biometría)
-- **Android** — en `android/app/src/main/AndroidManifest.xml`:
-  ```xml
-  <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-  ```
-- **iOS** — en `ios/App/App/Info.plist`:
+## 5. Permisos nativos (biometría)
+- **Android** ✅ `USE_BIOMETRIC` ya está en `android/app/src/main/AndroidManifest.xml`.
+- **iOS** ⏳ al crear la plataforma, agregar en `ios/App/App/Info.plist`:
   ```xml
   <key>NSFaceIDUsageDescription</key>
   <string>Usamos Face ID para que ingreses más rápido y seguro.</string>
   ```
 
-## 5. Compilar / abrir
+## 6. Compilar / abrir
 ```bash
 npx cap open android   # abre Android Studio → Run / Build APK
 npx cap open ios       # (en Mac) abre Xcode
