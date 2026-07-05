@@ -10,14 +10,14 @@
   <ion-refresher slot="fixed" (ionRefresh)="cargar($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
 
   <div class="admin">
-    <div class="filter-bar">
+    <div class="filter-bar" *ngIf="!chatAbierto && !verAvisos">
       <button class="filter-btn" [class.on]="vista==='taller'" (click)="vista='taller'">Equipo</button>
       <button class="filter-btn" [class.on]="vista==='mecanicos'" (click)="vista='mecanicos'">Avances mecánicos</button>
       <button class="filter-btn" [class.on]="vista==='clientes'" (click)="vista='clientes'">Clientes</button>
     </div>
 
-    <!-- Skeleton -->
-    <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:12px">
+    <!-- Skeleton (el chat trae su propio skeleton) -->
+    <div *ngIf="cargando && vista !== 'taller'" style="display:flex;flex-direction:column;gap:12px">
       <div class="sk-dark" style="height:80px"></div>
       <div class="sk-dark" style="height:80px"></div>
       <div class="sk-dark" style="height:80px"></div>
@@ -66,75 +66,13 @@
       <div class="empty" *ngIf="!notificaciones.length"><ion-icon name="mail-outline"></ion-icon><p>No se han enviado notificaciones.</p></div>
     </div>
 
-    <!-- Chat del taller -->
-    <ng-container *ngIf="!cargando && vista === 'taller'">
-      <div *ngIf="!chatAbierto">
-        <!-- Broadcast -->
-        <div class="cd mb">
-          <span class="cd-title">Mensaje a todos los mecánicos</span>
-          <div class="broadcast-row">
-            <input [(ngModel)]="broadcastTexto" placeholder="Escribí un aviso para todos…" class="broadcast-input" (keyup.enter)="enviarBroadcast()" />
-            <button class="btn btn-am" (click)="enviarBroadcast()" [disabled]="!broadcastTexto.trim() || enviandoBroadcast">
-              <ion-icon name="megaphone-outline"></ion-icon>
-            </button>
-          </div>
-        </div>
-
-        <!-- Broadcasts recientes -->
-        <div class="bc-card mb" *ngFor="let b of broadcasts">
-          <div class="bc-head"><ion-icon name="megaphone-outline"></ion-icon><strong>{{ b.remitente_nombre }}</strong><span>{{ hace(b.created_at) }}</span></div>
-          <p>{{ b.mensaje }}</p>
-        </div>
-
-        <!-- Conversaciones -->
-        <div class="conv-head">
-          <span class="cd-title conv-title">Conversaciones</span>
-          <button class="btn btn-cr btn-sm" (click)="nuevoChat()"><ion-icon name="create-outline"></ion-icon> Nuevo</button>
-        </div>
-        <div class="conv-list">
-          <button class="conv-item" *ngFor="let c of conversaciones" (click)="abrirChat(c)">
-            <span class="conv-av">{{ iniciales(c.nombre) }}</span>
-            <div class="conv-info">
-              <div class="conv-top"><strong>{{ c.nombre }}</strong><span>{{ hace(c.ultimo.created_at) }}</span></div>
-              <div class="conv-prev">
-                <span>{{ esMio(c.ultimo) ? 'Vos: ' : '' }}{{ c.ultimo.mensaje || '' }}<ion-icon *ngIf="!c.ultimo.mensaje && c.ultimo.foto" name="camera-outline" class="foto-ico"></ion-icon><span *ngIf="!c.ultimo.mensaje && c.ultimo.foto"> Foto</span></span>
-                <span class="conv-badge" *ngIf="c.noLeidos">{{ c.noLeidos }}</span>
-              </div>
-            </div>
-          </button>
-        </div>
-        <div class="empty" *ngIf="!conversaciones.length"><ion-icon name="chatbubbles-outline"></ion-icon><p>Sin conversaciones.</p></div>
-      </div>
-
-      <!-- Hilo de conversación -->
-      <div *ngIf="chatAbierto">
-        <div class="thread-head">
-          <button class="btn btn-ou btn-sm" (click)="cerrarChat()"><ion-icon name="chevron-back"></ion-icon> Volver</button>
-          <strong>{{ chatAbierto.nombre }}</strong>
-          <span class="bg bg-in">Mecánico</span>
-        </div>
-        <div class="thread-bubbles">
-          <ng-container *ngFor="let m of hilo; let i = index">
-            <div class="day-sep" *ngIf="mostrarSeparador(hilo, i)"><span>{{ etiquetaDia(m.created_at) }}</span></div>
-            <div class="bubble-row" [class.mio]="esMio(m)">
-              <div class="bubble">
-                <a class="bubble-order" *ngIf="m.orden_id" (click)="abrirOrden(m.orden_id)"
-                   style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--cr);cursor:pointer;margin-bottom:4px">
-                  <ion-icon name="document-text-outline" style="font-size:13px"></ion-icon> {{ m.numero_orden || 'Orden' }}
-                </a>
-                <img *ngIf="m.foto" [src]="m.foto" class="bubble-img" alt="Foto" />
-                <p *ngIf="m.mensaje">{{ m.mensaje }}</p>
-                <span class="b-time">{{ horaExacta(m.created_at) }}</span>
-              </div>
-            </div>
-          </ng-container>
-          <div class="empty" *ngIf="!hilo.length" style="padding:30px"><p>Escribí el primer mensaje</p></div>
-        </div>
-        <div class="send-row">
-          <input [(ngModel)]="borrador" placeholder="Escribí un mensaje…" (keyup.enter)="enviarChat()" />
-          <button class="btn btn-cr" (click)="enviarChat()" [disabled]="!borrador.trim() || enviandoChat"><ion-icon name="send"></ion-icon></button>
-        </div>
-      </div>
+    <!-- Chat interno 1:1 con el equipo (componentes compartidos) -->
+    <ng-container *ngIf="vista === 'taller'">
+      <app-chat-contactos *ngIf="!chatAbierto && !verAvisos"
+                          (abrir)="abrirChat($event)"
+                          (abrirAvisos)="verAvisos = true"></app-chat-contactos>
+      <app-chat-hilo *ngIf="chatAbierto" [contacto]="chatAbierto" (volver)="cerrarChat()"></app-chat-hilo>
+      <app-chat-hilo *ngIf="verAvisos" modo="avisos" (volver)="cerrarChat()"></app-chat-hilo>
     </ng-container>
   </div>
 </ion-content>

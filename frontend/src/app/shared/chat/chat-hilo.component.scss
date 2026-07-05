@@ -1,0 +1,149 @@
+// Hilo de conversación 1:1 (burbujas estilo WhatsApp, identidad Crimson Ops).
+// Consolida los estilos que antes vivían duplicados en mecanico-contacto y
+// recepcion-mensajes. Tokens globales → funciona en los shells de los 3 roles.
+.ch { display: flex; flex-direction: column; min-height: 100%; }
+
+/* Cabecera */
+.ch-head {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--ion-card-background); border: 1px solid var(--hairline);
+  border-radius: 16px; padding: 10px 12px; margin-bottom: 10px; box-shadow: var(--shadow-xs);
+}
+.ch-back {
+  width: 38px; height: 38px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--n-100, #f5f5f5); color: var(--ion-text-color);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  ion-icon { font-size: 20px; }
+  &:active { transform: scale(.94); }
+}
+.ch-av {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800;
+  &.sin-foto { background: var(--rose-50); color: var(--rose-700); }
+  img { width: 100%; height: 100%; object-fit: cover; }
+  &.bc { background: var(--amber-100, #fef3c7); color: var(--amber-700, #b45309);
+    ion-icon { font-size: 19px; } }
+}
+.ch-info { flex: 1; min-width: 0; line-height: 1.25;
+  strong { display: block; font-size: 14.5px; font-weight: 700;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  span { font-size: 11px; color: var(--n-500, #6b7280); } }
+.ch-btns { display: flex; gap: 6px;
+  button { width: 36px; height: 36px; border-radius: 10px; border: none; cursor: pointer;
+    background: var(--ion-color-primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    ion-icon { font-size: 17px; }
+    &.wa { background: var(--emerald-700, #047857); }
+    &:active { transform: scale(.95); } } }
+
+.ch-sk { display: flex; flex-direction: column; gap: 10px; }
+
+/* Separador de día */
+.day-sep { text-align: center; margin: 16px 0 8px;
+  span { display: inline-block; background: var(--n-100, #f3f4f6); color: var(--n-500);
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    padding: 4px 14px; border-radius: 999px; } }
+
+/* Mensaje de sistema (asignaciones) */
+.sys-row { display: flex; justify-content: center; padding: 2px 0; }
+.sys-chip {
+  max-width: 88%; text-align: center; font-size: 11.5px; line-height: 1.45;
+  background: var(--n-100, #f3f4f6); color: var(--n-500, #6b7280);
+  border-radius: 12px; padding: 6px 12px;
+  ion-icon { font-size: 13px; vertical-align: -2px; margin-right: 2px; }
+  em { font-style: normal; font-size: 10px; opacity: .8; }
+}
+
+/* Burbujas */
+.bubbles { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: flex-end;
+  gap: 6px; padding: 4px 0 8px; }
+.bubble-row {
+  display: flex; justify-content: flex-start; padding: 0 2px;
+  animation: bubbleIn .22s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)) both;
+  &.mio { justify-content: flex-end; }
+}
+.bubble {
+  position: relative; max-width: 72%; min-width: 64px;
+  padding: 8px 13px 6px; border-radius: 18px;
+  background: var(--ion-card-background); border: 1px solid var(--hairline);
+  border-bottom-left-radius: 6px; box-shadow: var(--shadow-sm);
+  p { margin: 0; font-size: 14.5px; line-height: 1.4; color: var(--ion-text-color);
+    white-space: pre-wrap; word-break: break-word; }
+  .b-time { display: block; margin-top: 2px; font-size: 10px; color: var(--n-400); text-align: right; }
+}
+.bubble-row.mio .bubble {
+  background: var(--ion-color-primary); border-color: transparent;
+  border-bottom-left-radius: 18px; border-bottom-right-radius: 6px;
+  box-shadow: 0 2px 10px rgba(225, 29, 72, .28);
+  p { color: #fff; }
+  .b-time { color: rgba(255, 255, 255, .75); }
+  .bubble-order { color: rgba(255, 255, 255, .85); }
+  .bubble-quien { color: rgba(255, 255, 255, .85); }
+}
+.bubble-row.mio + .bubble-row.mio,
+.bubble-row:not(.mio) + .bubble-row:not(.mio) { margin-top: -2px; }
+
+.bubble-img { max-width: 100%; border-radius: 10px; margin-bottom: 4px; }
+.bubble-quien { font-size: 10.5px; font-weight: 800; color: var(--ion-color-primary); margin-bottom: 2px; }
+.bubble-order { font-size: 10.5px; color: var(--ion-color-primary); font-weight: 600; margin-bottom: 4px; cursor: pointer;
+  ion-icon { font-size: 12px; vertical-align: -2px; margin-right: 2px; } }
+
+.read-icon { font-size: 13px; vertical-align: -2px; margin-left: 2px;
+  &.read { color: rgba(255, 255, 255, .95); } }
+
+.ch-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; color: var(--n-400); font-size: 14px; padding: 40px 16px;
+  ion-icon { font-size: 48px; opacity: .4; margin-bottom: 12px; }
+  p { margin: 0; } }
+
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(6px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Preview de foto */
+.foto-preview { position: fixed; bottom: 110px; left: 16px; right: 16px; z-index: 10;
+  background: var(--ion-card-background); border: 1px solid var(--hairline); border-radius: 14px;
+  padding: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, .12); max-width: 920px; margin: 0 auto;
+  img { width: 100%; max-height: 200px; object-fit: contain; border-radius: 10px; }
+  .foto-remove { position: absolute; top: -8px; right: -8px; width: 28px; height: 28px;
+    border-radius: 50%; border: none; background: var(--ion-color-danger); color: #fff;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    ion-icon { font-size: 18px; } } }
+
+/* Respuestas rápidas */
+.quick-replies {
+  position: sticky; bottom: 66px; z-index: 5;
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 10px 4px; background: var(--ion-card-background);
+  border-top: 1px solid var(--hairline);
+  .qr-btn { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--ion-color-primary);
+    background: transparent; color: var(--ion-color-primary); font-size: 12.5px; font-weight: 600;
+    cursor: pointer; white-space: nowrap; font-family: inherit;
+    &:active { background: var(--ion-color-primary); color: #fff; } }
+}
+
+/* Barra de envío */
+.quick-send {
+  position: sticky; bottom: 0; z-index: 6;
+  background: var(--ion-card-background);
+  border-top: 1px solid var(--hairline);
+  padding: 10px 4px calc(10px + env(safe-area-inset-bottom));
+  .qs-row { display: flex; gap: 8px; align-items: center; max-width: 920px; margin: 0 auto; }
+  .qs-msg { flex: 1; min-width: 0; border: 1px solid var(--hairline); border-radius: 999px;
+    padding: 12px 18px; font-size: 14px; background: var(--ion-card-background);
+    color: var(--ion-text-color); outline: none; font-family: inherit;
+    &:focus { border-color: var(--ion-color-primary); }
+    &::placeholder { color: var(--n-400); } }
+  .qs-attach { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+    background: var(--n-100, #f3f4f6); color: var(--n-600, #4b5563);
+    display: flex; align-items: center; justify-content: center;
+    ion-icon { font-size: 20px; }
+    &.active { background: var(--ion-color-primary); color: #fff; } }
+  .qs-send { flex-shrink: 0; width: 46px; height: 46px; border-radius: 50%; border: none;
+    background: var(--ion-color-primary); color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: transform .15s;
+    ion-icon { font-size: 20px; }
+    &:active { transform: scale(.95); }
+    &:disabled { opacity: .45; cursor: default; } }
+}

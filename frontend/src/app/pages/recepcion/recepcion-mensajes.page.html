@@ -11,14 +11,14 @@
   </ion-refresher>
 
   <div class="rec">
-    <div class="segment" *ngIf="!chatAbierto">
+    <div class="segment" *ngIf="!chatAbierto && !verAvisos">
       <button class="seg-btn" [class.on]="vista==='mecanicos'" (click)="vista='mecanicos'">Mecánicos</button>
       <button class="seg-btn" [class.on]="vista==='clientes'" (click)="vista='clientes'">Clientes</button>
-      <button class="seg-btn" [class.on]="vista==='taller'" (click)="vista='taller'">Taller</button>
+      <button class="seg-btn" [class.on]="vista==='taller'" (click)="vista='taller'">Equipo</button>
     </div>
 
-    <!-- Skeleton -->
-    <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:12px">
+    <!-- Skeleton (el chat trae su propio skeleton) -->
+    <div *ngIf="cargando && vista !== 'taller'" style="display:flex;flex-direction:column;gap:12px">
       <div class="skeleton" style="height:96px"></div>
       <div class="skeleton" style="height:96px"></div>
     </div>
@@ -71,115 +71,15 @@
       </div>
     </div>
 
-    <!-- Taller: chat interno con mecánicos -->
-    <ng-container *ngIf="!cargando && vista === 'taller'">
-
-      <!-- Lista de conversaciones -->
-      <div class="chat-list" *ngIf="!chatAbierto">
-        <!-- Broadcast -->
-        <div class="broadcast-section">
-          <span class="section-label">Mensaje a todos los mecánicos</span>
-          <div class="broadcast-bar">
-            <input type="text" [(ngModel)]="broadcastTexto" placeholder="Escribí un aviso para todos…" (keyup.enter)="enviarBroadcast()" />
-            <button (click)="enviarBroadcast()" [disabled]="!broadcastTexto.trim() || enviandoBroadcast">
-              <ion-icon name="megaphone-outline"></ion-icon>
-            </button>
-          </div>
-        </div>
-
-        <!-- Broadcasts recientes -->
-        <div class="broadcast-list" *ngIf="broadcasts.length">
-          <div class="broadcast-item" *ngFor="let b of broadcasts">
-            <ion-icon name="megaphone-outline" class="bc-icon"></ion-icon>
-            <div class="bc-body">
-              <p>{{ b.mensaje }}</p>
-              <span class="bc-meta">{{ b.remitente_nombre }} · {{ hace(b.created_at) }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="conv-header">
-          <span class="section-label" style="margin-top:12px">Conversaciones</span>
-          <select class="sucursal-filter" [(ngModel)]="sucursalFiltro" *ngIf="sucursales.length > 1">
-            <option [ngValue]="''">Todas las sedes</option>
-            <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
-          </select>
-        </div>
-        <button class="chat-nuevo" (click)="nuevoChat()">
-          <ion-icon name="create-outline"></ion-icon> Nuevo mensaje
-        </button>
-        <button class="chat-item" *ngFor="let c of conversaciones" (click)="abrirChat(c)">
-          <span class="avatar rose">{{ iniciales(c.nombre) }}</span>
-          <div class="chat-meta">
-            <div class="chat-top">
-              <strong>{{ c.nombre }}</strong>
-              <span class="sucursal-tag" *ngIf="c.sucursalNombre">{{ c.sucursalNombre }}</span>
-              <span class="chat-time">{{ hace(c.ultimo.created_at) }}</span>
-            </div>
-            <div class="chat-prev">
-              <span class="chat-last">{{ esMio(c.ultimo) ? 'Vos: ' : '' }}{{ c.ultimo.mensaje || 'Foto' }}</span>
-              <span class="chat-badge" *ngIf="c.noLeidos">{{ c.noLeidos }}</span>
-            </div>
-          </div>
-        </button>
-        <div class="empty-state" *ngIf="!conversaciones.length">
-          <ion-icon name="chatbubbles-outline"></ion-icon>
-          <p>Sin conversaciones. Tocá "Nuevo mensaje" para escribirle a un mecánico.</p>
-        </div>
-      </div>
-
-      <!-- Hilo de conversación -->
-      <div class="chat-thread" *ngIf="chatAbierto">
-        <div class="thread-head">
-          <button class="th-back" (click)="cerrarChat()" aria-label="Volver"><ion-icon name="chevron-back"></ion-icon></button>
-          <span class="avatar rose">{{ iniciales(chatAbierto.nombre) }}</span>
-          <div class="th-info"><strong>{{ chatAbierto.nombre }}</strong><span>Mecánico</span></div>
-        </div>
-        <div class="bubbles">
-          <ng-container *ngFor="let m of hilo; let i = index">
-            <div class="day-sep" *ngIf="mostrarSeparador(hilo, i)">
-              <span>{{ etiquetaDia(m.created_at) }}</span>
-            </div>
-            <div class="bubble-row" [class.mio]="esMio(m)">
-              <div class="bubble">
-                <div class="bubble-order" *ngIf="m.numero_orden" (click)="abrirOrden(m.orden_id)"
-                     [style.cursor]="m.orden_id ? 'pointer' : 'default'">
-                  <ion-icon name="document-text-outline"></ion-icon> {{ m.numero_orden }}
-                </div>
-                <img *ngIf="m.foto" [src]="m.foto" class="bubble-img" alt="Foto" />
-                <p *ngIf="m.mensaje">{{ m.mensaje }}</p>
-                <span class="b-time">
-                  {{ horaExacta(m.created_at) }}
-                  <ion-icon *ngIf="esMio(m)" [name]="m.visto ? 'checkmark-done' : 'checkmark'" [class.read]="m.visto" class="read-icon"></ion-icon>
-                </span>
-              </div>
-            </div>
-          </ng-container>
-          <div class="empty-thread" *ngIf="!hilo.length">Escribí el primer mensaje</div>
-        </div>
-      </div>
-
+    <!-- Equipo: chat interno 1:1 (componentes compartidos) -->
+    <ng-container *ngIf="vista === 'taller'">
+      <app-chat-contactos *ngIf="!chatAbierto && !verAvisos"
+                          (abrir)="abrirChat($event)"
+                          (abrirAvisos)="verAvisos = true"></app-chat-contactos>
+      <app-chat-hilo *ngIf="chatAbierto" [contacto]="chatAbierto" (volver)="cerrarChat()"></app-chat-hilo>
+      <app-chat-hilo *ngIf="verAvisos" modo="avisos" (volver)="cerrarChat()"></app-chat-hilo>
     </ng-container>
 
-    <div style="height:200px" *ngIf="!(vista === 'taller' && chatAbierto)"></div>
-  </div>
-
-  <!-- Preview de foto -->
-  <div class="foto-preview" *ngIf="fotoPreview && vista === 'taller' && chatAbierto">
-    <img [src]="fotoPreview" alt="Preview" />
-    <button class="foto-remove" (click)="quitarFoto()"><ion-icon name="close-circle"></ion-icon></button>
-  </div>
-
-  <!-- Redactor del chat del taller -->
-  <div class="quick-send chat" *ngIf="vista === 'taller' && chatAbierto">
-    <div class="qs-inner">
-      <div class="qs-row">
-        <button class="qs-attach" (click)="adjuntarFoto()" title="Adjuntar foto"><ion-icon name="camera-outline"></ion-icon></button>
-        <input type="text" [(ngModel)]="borrador" placeholder="Escribí un mensaje…" class="qs-msg" (keyup.enter)="enviarChat()" />
-        <button class="qs-send" (click)="enviarChat()" [disabled]="(!borrador.trim() && !fotoPreview) || enviandoChat">
-          <ion-icon name="send"></ion-icon>
-        </button>
-      </div>
-    </div>
+    <div style="height:120px" *ngIf="vista !== 'taller'"></div>
   </div>
 </ion-content>

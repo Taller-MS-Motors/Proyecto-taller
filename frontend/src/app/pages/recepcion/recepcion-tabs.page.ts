@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
-import { RecepcionService } from '../../services/recepcion.service';
+import { MensajeriaService } from '../../services/mensajeria.service';
 
 @Component({
   standalone: false,
@@ -14,7 +14,7 @@ export class RecepcionTabsPage implements OnInit, OnDestroy {
   noLeidos = 0;
   private destroy$ = new Subject<void>();
 
-  constructor(private auth: AuthService, private router: Router, private rec: RecepcionService) {}
+  constructor(private auth: AuthService, private router: Router, private msj: MensajeriaService) {}
 
   ngOnInit() {
     this.consultarNoLeidos();
@@ -22,7 +22,7 @@ export class RecepcionTabsPage implements OnInit, OnDestroy {
   }
 
   private consultarNoLeidos() {
-    this.rec.getMensajesNoLeidos().pipe(takeUntil(this.destroy$)).subscribe({
+    this.msj.getNoLeidos().pipe(takeUntil(this.destroy$)).subscribe({
       next: r => this.noLeidos = r.data.count,
     });
   }

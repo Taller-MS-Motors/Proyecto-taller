@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
-import { RecepcionService } from '../../services/recepcion.service';
+import { MensajeriaService } from '../../services/mensajeria.service';
 
 @Component({
   standalone: false,
@@ -14,7 +14,7 @@ export class AdminShellPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   noLeidos = 0;
 
-  constructor(private auth: AuthService, private rec: RecepcionService, private router: Router) {}
+  constructor(private auth: AuthService, private msj: MensajeriaService, private router: Router) {}
 
   get nombre(): string { return this.auth.getUsuario()?.nombre || 'Administrador'; }
   get rolLabel(): string { return 'Administrador'; }
@@ -31,7 +31,7 @@ export class AdminShellPage implements OnInit, OnDestroy {
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
 
   private consultarNoLeidos() {
-    this.rec.getMensajesNoLeidos().pipe(takeUntil(this.destroy$)).subscribe({
+    this.msj.getNoLeidos().pipe(takeUntil(this.destroy$)).subscribe({
       next: r => this.noLeidos = r.data.count,
       error: () => {},
     });

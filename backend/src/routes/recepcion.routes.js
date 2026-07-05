@@ -877,6 +877,9 @@ router.post('/notificar', async (req, res) => {
 
 // ───────────────────────────────────────────────────────────
 // Mensajería interna con los mecánicos (lado recepción)
+// @deprecated — el chat del personal migró a /api/mensajeria (1:1 por persona).
+// Estos endpoints de buzón por rol quedan operativos por compatibilidad y se
+// eliminarán en un release futuro. No agregar features acá.
 // ───────────────────────────────────────────────────────────
 // LEIDO_POR_MI trae un `?` (mi id): va SIEMPRE como primer parámetro de cada query.
 const SELECT_MSG_INT = `

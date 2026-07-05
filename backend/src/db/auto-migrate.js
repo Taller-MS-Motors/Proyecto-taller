@@ -403,6 +403,11 @@ async function ensureSchema() {
         INDEX idx_ml_usuario (usuario_id)
       )`);
 
+    // Mensajería v4 (chat 1:1 estilo WhatsApp): índices para leer hilos por par
+    // de usuarios y bandejas por destinatario sin escanear la tabla.
+    await crearIndiceSiFalta('mensajes_internos', 'idx_msg_par', '(remitente_id, destino_id, created_at)');
+    await crearIndiceSiFalta('mensajes_internos', 'idx_msg_destino_created', '(destino_id, created_at)');
+
     // FK constraints en columnas agregadas por addColumnIfMissing (integridad referencial).
     await tryStep('fk citas.tecnico_id', () => addFkIfMissing('citas', 'fk_citas_tecnico', 'tecnico_id', 'usuarios', 'id'));
     await tryStep('fk citas.orden_id', () => addFkIfMissing('citas', 'fk_citas_orden', 'orden_id', 'ordenes_trabajo', 'id'));

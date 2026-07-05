@@ -1,0 +1,49 @@
+<div class="cc">
+  <!-- Búsqueda -->
+  <div class="cc-buscar">
+    <ion-icon name="search-outline"></ion-icon>
+    <input type="text" [(ngModel)]="q" placeholder="Buscar contacto…" />
+  </div>
+
+  <!-- Avisos del taller (broadcast, separado de los 1:1) -->
+  <button type="button" class="cc-row cc-avisos" (click)="abrirAvisos.emit()">
+    <span class="cc-av bc"><ion-icon name="megaphone-outline"></ion-icon></span>
+    <span class="cc-main">
+      <span class="cc-top"><strong>Avisos del taller</strong></span>
+      <span class="cc-prev">Mensajes para todo el equipo</span>
+    </span>
+    <span class="cc-badge" *ngIf="avisosNoLeidos">{{ avisosNoLeidos }}</span>
+  </button>
+
+  <!-- Skeleton con forma de fila de contacto -->
+  <div *ngIf="cargando" class="cc-sk">
+    <div class="skeleton cc-sk-row" *ngFor="let n of [1,2,3,4]"></div>
+  </div>
+
+  <!-- Contactos -->
+  <ng-container *ngIf="!cargando">
+    <button type="button" class="cc-row" *ngFor="let c of filtrados" (click)="abrir.emit(c)">
+      <span class="cc-av" [class.sin-foto]="!c.foto">
+        <img *ngIf="c.foto" [src]="c.foto" alt="" />
+        <ng-container *ngIf="!c.foto">{{ iniciales(c.nombre) }}</ng-container>
+      </span>
+      <span class="cc-main">
+        <span class="cc-top">
+          <strong>{{ c.nombre }}</strong>
+          <span class="cc-rol" [attr.data-rol]="c.rol">{{ rolLabel[c.rol] || c.rol }}</span>
+        </span>
+        <span class="cc-prev" [class.sin-msj]="!c.ultima_fecha">{{ preview(c) }}</span>
+      </span>
+      <span class="cc-meta">
+        <span class="cc-hora mono" [class.on]="c.no_leidos">{{ horaLista(c.ultima_fecha) }}</span>
+        <span class="cc-badge" *ngIf="c.no_leidos">{{ c.no_leidos }}</span>
+      </span>
+    </button>
+
+    <div class="cc-empty" *ngIf="!filtrados.length">
+      <ion-icon name="people-outline"></ion-icon>
+      <p *ngIf="q">Nadie coincide con "{{ q }}".</p>
+      <p *ngIf="!q">No hay más personas en el equipo todavía.</p>
+    </div>
+  </ng-container>
+</div>

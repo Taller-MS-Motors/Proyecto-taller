@@ -1,8 +1,8 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject, interval } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { MecanicoService } from '../../services/mecanico.service';
 import { AuthService } from '../../services/auth.service';
+import { MensajeriaService } from '../../services/mensajeria.service';
 
 @Component({
   standalone: false,
@@ -13,7 +13,7 @@ export class MecanicoTabsPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   noLeidos = 0;
 
-  constructor(private mecanico: MecanicoService, private auth: AuthService) {}
+  constructor(private msj: MensajeriaService, private auth: AuthService) {}
 
   get nombre(): string {
     return this.auth.getUsuario()?.nombre || 'Mecánico';
@@ -37,7 +37,7 @@ export class MecanicoTabsPage implements OnInit, OnDestroy {
   }
 
   private consultarNoLeidos() {
-    this.mecanico.getNoLeidos().pipe(takeUntil(this.destroy$)).subscribe({
+    this.msj.getNoLeidos().pipe(takeUntil(this.destroy$)).subscribe({
       next: r => this.noLeidos = r.data.count,
     });
   }
