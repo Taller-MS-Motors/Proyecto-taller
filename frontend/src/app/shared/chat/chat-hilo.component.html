@@ -14,7 +14,6 @@
       <span>{{ esAvisos ? 'Para todo el equipo' : (rolLabel[contacto?.rol || ''] || contacto?.rol) }}</span>
     </div>
     <div class="ch-btns" *ngIf="!esAvisos && contacto?.telefono">
-      <button type="button" (click)="llamar()" title="Llamar"><ion-icon name="call"></ion-icon></button>
       <button type="button" class="wa" (click)="whatsapp()" title="WhatsApp"><ion-icon name="logo-whatsapp"></ion-icon></button>
     </div>
   </div>

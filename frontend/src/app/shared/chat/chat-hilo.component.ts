@@ -125,7 +125,6 @@ export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
 
   esMio(m: any): boolean { return m.remitente_id === this.miId; }
   abrirOrden(id: number) { if (id) this.router.navigate(['/detalle-orden', id]); }
-  llamar() { if (this.contacto?.telefono) window.open(`tel:${this.contacto.telefono}`, '_self'); }
   whatsapp() { if (this.contacto?.telefono) abrirWhatsApp(this.contacto.telefono, ''); }
 
   iniciales(nombre?: string): string {
