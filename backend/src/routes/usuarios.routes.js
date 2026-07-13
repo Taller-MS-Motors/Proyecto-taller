@@ -39,6 +39,8 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'nombre, email, contraseña y rol son requeridos' });
     }
     if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+    // Piso de contraseña (igual que el portal): frena contraseñas triviales del personal.
+    if (String(password).length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
     if (!ROLES.includes(rol)) return res.status(400).json({ error: 'Rol no válido' });
     const hash = await bcrypt.hash(password, 10);
     const sucursal_id = await sucursalDelBody(req.body.sucursal_id);

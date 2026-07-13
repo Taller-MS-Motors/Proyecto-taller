@@ -39,17 +39,48 @@ if (esProduccion) {
 // para que req.ip sea la IP real del cliente (necesario para el rate limiting).
 if (esProduccion) app.set('trust proxy', 1);
 
+// No revelar el framework (Express manda "X-Powered-By" por defecto): menos pistas
+// para un atacante que busca vulnerabilidades conocidas del stack.
+app.disable('x-powered-by');
+
 // Compresión gzip/brotli de las respuestas (JSON y estáticos). Recorta el ancho
 // de banda de forma notable, sobre todo en listados.
 app.use(compression());
 
-// Headers de seguridad básicos (sin dependencias). No tocan el CSP para no romper
-// el SPA de Angular/Ionic, que usa estilos/scripts inline.
+// Headers de seguridad (sin dependencias externas).
+// CSP: endurecido pero compatible con el SPA de Angular/Ionic. Se permite
+// 'unsafe-inline' en script/style porque Ionic inyecta estilos inline y las
+// ventanas de impresión (comprobantes/PDF, abiertas con window.open + document.write)
+// usan un <script>window.print()</script> inline que heredaría este CSP. Aun así se
+// bloquea lo más peligroso: orígenes externos de script, <object>/<embed>, secuestro
+// de <base>, envío de formularios a terceros y el enmarcado del sitio (anti-clickjacking).
+// Nota: solo afecta a la web servida por este server; la app nativa (Capacitor) carga
+// sus propios assets y no recibe estas cabeceras.
+// Google Fonts: index.html carga la hoja de estilos desde fonts.googleapis.com y
+// las tipografías desde fonts.gstatic.com — se permiten explícitamente en style/font.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('X-XSS-Protection', '0');
+  res.setHeader('Content-Security-Policy', CSP);
+  // Aísla el contexto de navegación pero deja funcionar los popups (impresión de comprobantes).
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  // El sitio web no usa cámara/micrófono/ubicación: se niegan por completo.
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   if (esProduccion) {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }

@@ -8,7 +8,7 @@ import { DashboardService } from '../../services/dashboard.service';
 import { OrdenesService } from '../../services/ordenes.service';
 import { ESTADO_CONFIG, EstadoOrden } from '../../models/orden.model';
 import { descargarCSV, fechaCorta } from '../../shared/csv.util';
-import { generarPDF, formatMoneda, formatPct } from '../../shared/pdf.util';
+import { generarPDF, formatMoneda, formatPct, escapeHtml } from '../../shared/pdf.util';
 
 type Sem = 'rojo' | 'amarillo' | 'verde' | 'gris';
 
@@ -212,7 +212,7 @@ export class AdminResumenPage implements OnInit, OnDestroy {
         <div class="section-title">Top servicios del mes</div>
         ${(d.top_servicios || []).map((s: any) => `
           <div class="bar-wrap">
-            <span class="bar-label">${s.servicio}</span>
+            <span class="bar-label">${escapeHtml(s.servicio)}</span>
             <div class="bar-track"><div class="bar-fill" style="width:${this.pct(s.total, this.maxServicio)}%"></div></div>
             <span class="bar-val">${s.total}</span>
           </div>`).join('')}
@@ -225,7 +225,7 @@ export class AdminResumenPage implements OnInit, OnDestroy {
           <tr><th>Servicio</th><th class="right">Citas</th><th class="right">Ingreso</th><th class="right">Promedio</th></tr>
           ${(d.ingresos_por_servicio || []).map((r: any) => `
             <tr>
-              <td>${r.servicio}</td>
+              <td>${escapeHtml(r.servicio)}</td>
               <td class="right mono">${r.citas}</td>
               <td class="right mono">${formatMoneda(r.ingreso)}</td>
               <td class="right mono">${formatMoneda(r.promedio)}</td>
@@ -241,7 +241,7 @@ export class AdminResumenPage implements OnInit, OnDestroy {
           <tr><th>Mecánico</th><th class="right">Órdenes</th><th class="right">Horas prom.</th></tr>
           ${this.tecnicos.map(t => `
             <tr>
-              <td>${t.nombre}</td>
+              <td>${escapeHtml(t.nombre)}</td>
               <td class="right mono">${t.ordenes_completadas || 0}</td>
               <td class="right mono">${t.horas_promedio || '—'}</td>
             </tr>`).join('')}

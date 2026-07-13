@@ -1,4 +1,18 @@
+// Escapa texto para interpolar sin riesgo dentro de HTML (texto o atributos).
+// Estas páginas se abren con document.write en una ventana del MISMO origen y
+// corren un <script> inline: un dato sin escapar (nombre, comentario, servicio)
+// sería XSS con acceso al token en localStorage. Todo valor dinámico DEBE pasar por acá.
+export function escapeHtml(v: any): string {
+  return String(v ?? '').replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
+  ));
+}
+
+// `titulo` se escapa acá como red de seguridad. `contenido` es HTML por diseño
+// (tablas, barras): cada valor dinámico que arme el llamador debe venir ya escapado
+// con escapeHtml() — no se puede escapar el bloque entero sin romper el maquetado.
 export async function generarPDF(titulo: string, contenido: string, logoUrl = 'assets/logo/ms-iso.png') {
+  titulo = escapeHtml(titulo);
   let logoBase64 = '';
   try {
     const resp = await fetch(logoUrl);

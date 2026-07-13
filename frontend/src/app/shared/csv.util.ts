@@ -5,7 +5,12 @@ export function descargarCSV(nombreArchivo: string, columnas: { key: string; lab
   const sep = ';';
   const escapar = (v: any) => {
     if (v === null || v === undefined) return '';
-    const s = String(v).replace(/"/g, '""');
+    const s0 = String(v);
+    // Anti inyección de fórmulas (CSV injection): un valor que empieza con = + - @
+    // (o tab/CR) puede ejecutarse como fórmula al abrir el CSV en Excel/Sheets. Se le
+    // antepone un apóstrofo, salvo que sea un número legítimo (no romper negativos).
+    const peligroso = /^[=+\-@\t\r]/.test(s0) && !/^-?\d+([.,]\d+)?$/.test(s0);
+    const s = (peligroso ? "'" + s0 : s0).replace(/"/g, '""');
     return /[";\n]/.test(s) ? `"${s}"` : s;
   };
 
