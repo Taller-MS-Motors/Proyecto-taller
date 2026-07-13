@@ -1,6 +1,13 @@
 const { pool } = require('../db/pool');
 const { getConfig } = require('./configuracion');
 const { recompensas } = require('./recompensas');
+const { enviarAvisoEstado } = require('../services/mailer');
+
+// Hitos del servicio que además del aviso in-app disparan un correo al cliente.
+const ESTADOS_EMAIL = {
+  listo:     { titulo: 'Tu moto está lista', mensaje: (moto) => `${moto} ya está lista para entrega. Podés pasar a retirarla.` },
+  entregado: { titulo: 'Servicio entregado', mensaje: (moto) => `${moto} fue entregada. ¡Gracias por tu visita!` },
+};
 
 const ESTADO_LEGIBLE = {
   agendado: 'Agendada',
@@ -33,7 +40,8 @@ async function notificarCambioEstado(citaId, estado) {
     const config = await getConfig();
     if (!config.notif_estado) return;
     const [[cita]] = await pool.query(
-      `SELECT ci.cliente_id, cl.notif_avances, m.marca, m.modelo
+      `SELECT ci.cliente_id, cl.notif_avances, cl.nombre AS cliente_nombre, cl.email AS cliente_email,
+              m.marca, m.modelo
        FROM citas ci
        LEFT JOIN motos m ON m.id = ci.moto_id
        LEFT JOIN clientes cl ON cl.id = ci.cliente_id
@@ -52,6 +60,17 @@ async function notificarCambioEstado(citaId, estado) {
       mensaje: `El estado de tu cita cambió a "${legible}".`,
       tipo: estado,
     });
+    // Hitos (listo/entregado): además del feed, un correo si el cliente tiene email.
+    // Reusa el consentimiento ya validado arriba (notif_estado del taller + notif_avances del cliente).
+    const email = ESTADOS_EMAIL[estado];
+    if (email && cita.cliente_email) {
+      await enviarAvisoEstado(cita.cliente_email, {
+        nombre: cita.cliente_nombre,
+        titulo: email.titulo,
+        mensaje: email.mensaje(moto),
+        taller: config.nombre_taller,
+      });
+    }
     // Al entregar, si el cliente acaba de desbloquear su cortesía, avisarle.
     if (estado === 'entregado') await notificarCortesia(cita.cliente_id);
   } catch (err) {

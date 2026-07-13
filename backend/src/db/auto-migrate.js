@@ -144,6 +144,12 @@ async function ensureSchema() {
     await addColumnIfMissing('citas', 'hora_llegada', 'DATETIME NULL');
     await addColumnIfMissing('citas', 'fecha_listo', 'TIMESTAMP NULL');
 
+    // Automatización (jobs programados):
+    // recordatorio_enviado: idempotencia del job de recordatorios (1 = ya se avisó de esta cita).
+    // no_show: el job diario marca las citas vencidas nunca atendidas (no las cancela ni borra).
+    await addColumnIfMissing('citas', 'recordatorio_enviado', 'TINYINT(1) NOT NULL DEFAULT 0');
+    await addColumnIfMissing('citas', 'no_show', 'TINYINT(1) NOT NULL DEFAULT 0');
+
     // Nuevos estados de la cita (flujo que ve el cliente en el portal).
     // Idempotente: solo migra si el enum todavía tiene los estados viejos.
     const [[citaEstado]] = await pool.query(

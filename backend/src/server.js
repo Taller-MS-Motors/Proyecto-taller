@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const { testConnection } = require('./db/pool');
 const { ensureSchema } = require('./db/auto-migrate');
+const { iniciarJobs } = require('./jobs/scheduler');
 const { apiLimiter, authLimiter, adminLimiter } = require('./middleware/rate-limit');
 
 const app = express();
@@ -119,5 +120,8 @@ const PORT = process.env.PORT || 3000;
 (async () => {
   await testConnection();
   await ensureSchema();
+  // Tareas de fondo (recordatorios de cita, no-show). Después de migrar, para que
+  // las columnas que usan (recordatorio_enviado, no_show) ya existan.
+  iniciarJobs();
   app.listen(PORT, () => console.log(`🚀 Servidor en http://localhost:${PORT}`));
 })();

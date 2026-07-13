@@ -14,6 +14,7 @@ const META_TIPO: Record<string, { icon: string; tono: string }> = {
   listo:            { icon: 'checkmark-circle-outline',  tono: 'verde' },
   entregado:        { icon: 'checkmark-done-outline',    tono: 'verde' },
   cancelado:        { icon: 'close-circle-outline',      tono: 'rojo' },
+  recordatorio:     { icon: 'alarm-outline',             tono: 'azul' },
   presupuesto:      { icon: 'receipt-outline',           tono: 'ambar' },
   cortesia:         { icon: 'gift-outline',              tono: 'rosa' },
   mensaje:          { icon: 'chatbubble-ellipses-outline', tono: 'azul' },
