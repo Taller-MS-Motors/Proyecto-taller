@@ -24,6 +24,15 @@ export class PortalInicioPage implements OnInit, OnDestroy {
   readonly estadoLabel = ESTADO_CITA_LABEL;
   readonly fechaHoy = new Date().toLocaleDateString('es-CR', { weekday: 'short', day: 'numeric', month: 'short' });
 
+  // Flujo de la cita en el taller (para el stepper de la tarjeta cockpit).
+  readonly flujoCita = [
+    { k: 'agendado', label: 'Recepción' },
+    { k: 'en_revision', label: 'Revisión' },
+    { k: 'en_mantenimiento', label: 'Reparación' },
+    { k: 'listo', label: 'Lista' },
+    { k: 'entregado', label: 'Entrega' },
+  ];
+
   constructor(
     public portal: PortalService,
     private router: Router,
@@ -125,6 +134,18 @@ export class PortalInicioPage implements OnInit, OnDestroy {
 
   irAgendar() { this.router.navigate(['/portal/agendar']); }
   irCitas() { this.router.navigate(['/portal/mis-citas']); }
+  irMotos() { this.router.navigate(['/portal/motos']); }
+  irNotificaciones() { this.router.navigate(['/portal/notificaciones']); }
+
+  // Índice del paso actual en el flujo de la cita (0..4).
+  pasoCita(estado?: string): number {
+    const i = this.flujoCita.findIndex(p => p.k === estado);
+    return i < 0 ? 0 : i;
+  }
+  // % de avance para la barra del cockpit.
+  pctCita(estado?: string): number {
+    return Math.round((this.pasoCita(estado) / (this.flujoCita.length - 1)) * 100);
+  }
   verCita(p: any) {
     if (!p?.id) return;
     window.location.href = `/portal/cita/${p.id}`;
