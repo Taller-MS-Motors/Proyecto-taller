@@ -15,56 +15,8 @@
 
   <div class="ini">
     <div class="greet" *ngIf="portal.getCliente() as c">
-      <div class="greet-txt">
-        <h1>Hola, {{ c.nombre }}</h1>
-        <span class="greet-sub">Tu moto está en buenas manos</span>
-      </div>
+      <h1>Hola, {{ c.nombre }}</h1>
       <span class="greet-date mono">{{ fechaHoy }}</span>
-    </div>
-
-    <!-- Cockpit: la moto en el taller (seguimiento en vivo) -->
-    <section class="cockpit" *ngIf="resumen?.proxima_cita as p" (click)="verCita(p)"
-             [hidden]="p.tipo !== 'en_curso'">
-      <div class="ck-top">
-        <span class="ck-tag"><span class="ck-dot"></span> Tu moto en el taller</span>
-        <span class="pill amber">{{ estadoLabel[p.estado] }}</span>
-      </div>
-      <h2 class="ck-model">{{ p.marca }} {{ p.modelo }}</h2>
-      <span class="ck-placa mono" *ngIf="p.placa">{{ p.placa }}</span>
-
-      <!-- Stepper -->
-      <div class="ck-steps">
-        <ng-container *ngFor="let s of flujoCita; let i = index; let last = last">
-          <div class="ck-step" [class.done]="i < pasoCita(p.estado)" [class.now]="i === pasoCita(p.estado)">
-            <span class="ck-node">
-              <ion-icon *ngIf="i < pasoCita(p.estado)" name="checkmark"></ion-icon>
-            </span>
-            <span class="ck-lbl">{{ s.label }}</span>
-          </div>
-          <span class="ck-line" *ngIf="!last" [class.fill]="i < pasoCita(p.estado)"></span>
-        </ng-container>
-      </div>
-
-      <div class="ck-foot">
-        <span class="ck-pct mono">{{ pctCita(p.estado) }}% completado</span>
-        <span class="ck-ver">Ver seguimiento <ion-icon name="chevron-forward"></ion-icon></span>
-      </div>
-    </section>
-
-    <!-- Accesos rápidos -->
-    <div class="quick">
-      <button class="qk" (click)="irAgendar()">
-        <span class="qk-ic"><ion-icon name="calendar-outline"></ion-icon></span>
-        <span class="qk-l">Agendar cita</span>
-      </button>
-      <button class="qk" (click)="irMotos()">
-        <span class="qk-ic"><ion-icon name="bicycle-outline"></ion-icon></span>
-        <span class="qk-l">Mi garaje</span>
-      </button>
-      <button class="qk" (click)="irNotificaciones()">
-        <span class="qk-ic"><ion-icon name="notifications-outline"></ion-icon></span>
-        <span class="qk-l">Avisos</span>
-      </button>
     </div>
 
     <!-- Presupuestos por aprobar -->
@@ -143,8 +95,8 @@
       </div>
     </section>
 
-    <!-- Cita destacada: próxima / vencida (la "en curso" usa el cockpit de arriba) -->
-    <section class="card next" *ngIf="resumen?.proxima_cita as p" [hidden]="p.tipo === 'en_curso'" [class.is-vencida]="p.tipo === 'vencida'">
+    <!-- Cita destacada: próxima / en curso / vencida -->
+    <section class="card next" *ngIf="resumen?.proxima_cita as p" [class.is-vencida]="p.tipo === 'vencida'" [class.is-curso]="p.tipo === 'en_curso'">
       <div class="next-head">
         <span class="section-label">{{ tituloCita(p.tipo) }}</span>
         <span class="prox-badge" *ngIf="badgeCita(p) as b" [ngClass]="'pb-' + b.tono">{{ b.texto }}</span>

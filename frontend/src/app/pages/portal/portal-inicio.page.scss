@@ -1,73 +1,9 @@
 .ini { max-width: 820px; margin: 0 auto; padding: 12px 16px 0; }
 
 .greet {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin: 6px 2px 18px;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 2px 18px;
   h1 { font-family: var(--font-display); font-size: 28px; font-weight: 800; letter-spacing: -0.03em; margin: 0; }
-  .greet-sub { font-size: 13px; color: var(--n-500); font-weight: 500; }
-  .greet-date { font-size: 12px; color: var(--n-400); font-weight: 600; text-transform: capitalize; flex-shrink: 0; margin-top: 6px; }
-}
-
-/* Cockpit: la moto en el taller (fondo oscuro, seguimiento en vivo) */
-.cockpit {
-  display: block; width: 100%; text-align: left; cursor: pointer;
-  background: #171717; color: #fff; border: none;
-  border-radius: 24px; padding: 20px; margin-bottom: 14px;
-  box-shadow: 0 10px 30px rgba(23, 23, 23, .28);
-  animation: cardRise .4s var(--ease, cubic-bezier(0.32, 0.72, 0, 1)) both;
-  &:active { transform: scale(.99); }
-
-  .ck-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .ck-tag { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 800;
-    text-transform: uppercase; letter-spacing: .06em; color: rgba(255, 255, 255, .75); }
-  .ck-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ion-color-primary);
-    box-shadow: 0 0 0 0 rgba(225, 29, 72, .6); animation: ckPulse 1.8s infinite; }
-
-  .ck-model { font-family: var(--font-display); font-size: 22px; font-weight: 800; letter-spacing: -.02em;
-    margin: 14px 0 0; color: #fff; }
-  .ck-placa { display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 8px;
-    font-size: 12px; letter-spacing: .08em; background: rgba(255, 255, 255, .1);
-    border: 1px solid rgba(255, 255, 255, .18); color: #fff; }
-
-  /* Stepper */
-  .ck-steps { display: flex; align-items: flex-start; margin: 20px 0 6px; }
-  .ck-step { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; width: 44px; }
-  .ck-node { width: 22px; height: 22px; border-radius: 50%; background: rgba(255, 255, 255, .12);
-    border: 2px solid rgba(255, 255, 255, .25); display: flex; align-items: center; justify-content: center;
-    ion-icon { font-size: 13px; color: #fff; } }
-  .ck-lbl { font-size: 9.5px; font-weight: 700; text-align: center; color: rgba(255, 255, 255, .55);
-    text-transform: uppercase; letter-spacing: .02em; line-height: 1.2; }
-  .ck-line { flex: 1; height: 2px; margin-top: 10px; background: rgba(255, 255, 255, .18); border-radius: 2px;
-    &.fill { background: var(--ion-color-primary); } }
-  .ck-step.done .ck-node { background: var(--ion-color-primary); border-color: var(--ion-color-primary); }
-  .ck-step.now .ck-node { background: var(--ion-color-primary); border-color: #fff;
-    box-shadow: 0 0 0 4px rgba(225, 29, 72, .3); }
-  .ck-step.done .ck-lbl, .ck-step.now .ck-lbl { color: #fff; }
-
-  .ck-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, .12); }
-  .ck-pct { font-size: 13px; font-weight: 700; color: #fff; }
-  .ck-ver { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; font-weight: 700;
-    color: var(--ion-color-primary); ion-icon { font-size: 15px; } }
-}
-@keyframes ckPulse {
-  0% { box-shadow: 0 0 0 0 rgba(225, 29, 72, .55); }
-  70% { box-shadow: 0 0 0 7px rgba(225, 29, 72, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
-}
-
-/* Accesos rápidos */
-.quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
-.qk {
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  background: var(--ion-card-background); border: 1px solid var(--hairline);
-  border-radius: 18px; box-shadow: var(--shadow-xs); padding: 16px 8px; cursor: pointer; font-family: inherit;
-  transition: transform .15s, border-color .2s;
-  &:active { transform: scale(.97); }
-  &:hover { border-color: rgba(225, 29, 72, .18); }
-  .qk-ic { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    background: var(--rose-50); color: var(--ion-color-primary);
-    ion-icon { font-size: 20px; } }
-  .qk-l { font-size: 12px; font-weight: 700; color: var(--ion-text-color); text-align: center; }
+  .greet-date { font-size: 12px; color: var(--n-400); font-weight: 600; text-transform: capitalize; flex-shrink: 0; }
 }
 
 /* Stat cards */
@@ -146,6 +82,10 @@
     ion-icon { font-size: 16px; }
     &:active { transform: scale(.98); }
     &.ghost { background: none; border: 1.5px solid var(--hairline); color: var(--text-accent); box-shadow: none; }
+  }
+  .next-ion-btn {
+    margin-top: 14px; --border-radius: 14px; --border-color: var(--hairline);
+    --color: var(--text-accent); font-weight: 700; font-size: 14px;
   }
 }
 
