@@ -107,13 +107,13 @@
               <span>Notificar cuando la cotización está lista</span>
               <ion-toggle [(ngModel)]="config.notif_cotizacion"></ion-toggle>
             </label>
-            <label class="config-notif-row config-notif-row--disabled">
-              <span>Recordatorio 24h antes de la cita <em class="config-notif-note">(aún no activo)</em></span>
-              <ion-toggle [(ngModel)]="config.notif_recordatorio" disabled></ion-toggle>
+            <label class="config-notif-row">
+              <span>Recordatorio al cliente el día antes de la cita</span>
+              <ion-toggle [(ngModel)]="config.notif_recordatorio"></ion-toggle>
             </label>
-            <label class="config-notif-row config-notif-row--disabled">
-              <span>Enviar reporte por email al entregar <em class="config-notif-note">(aún no activo)</em></span>
-              <ion-toggle [(ngModel)]="config.notif_email_entrega" disabled></ion-toggle>
+            <label class="config-notif-row">
+              <span>Avisar por email cuando la moto está lista o entregada</span>
+              <ion-toggle [(ngModel)]="config.notif_email_entrega"></ion-toggle>
             </label>
           </div>
           <button class="btn btn-cr config-btn-full" [disabled]="guardando" (click)="guardarConfig()">Guardar</button>

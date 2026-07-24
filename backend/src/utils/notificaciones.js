@@ -61,9 +61,10 @@ async function notificarCambioEstado(citaId, estado) {
       tipo: estado,
     });
     // Hitos (listo/entregado): además del feed, un correo si el cliente tiene email.
-    // Reusa el consentimiento ya validado arriba (notif_estado del taller + notif_avances del cliente).
+    // El feed ya pasó el consentimiento (notif_estado + notif_avances); el email además
+    // exige el toggle del taller `notif_email_entrega` (el admin decide si manda correos).
     const email = ESTADOS_EMAIL[estado];
-    if (email && cita.cliente_email) {
+    if (email && cita.cliente_email && config.notif_email_entrega) {
       await enviarAvisoEstado(cita.cliente_email, {
         nombre: cita.cliente_nombre,
         titulo: email.titulo,
