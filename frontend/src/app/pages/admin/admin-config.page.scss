@@ -202,16 +202,25 @@
 .config-notif-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
   font-size: 13px;
+  // Separa la lista del botón "Guardar" (antes quedaba pegado/encimado).
+  margin-bottom: 16px;
 }
 
 .config-notif-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;            // aire entre la etiqueta y el toggle
+  min-height: 34px;     // altura pareja: el toggle de Ionic no aprieta la fila
   text-transform: none;
   letter-spacing: 0;
+
+  // El toggle mantiene su tamaño aunque la etiqueta sea larga (no se encima).
+  ion-toggle {
+    flex-shrink: 0;
+  }
 
   &--disabled {
     opacity: 0.55;
