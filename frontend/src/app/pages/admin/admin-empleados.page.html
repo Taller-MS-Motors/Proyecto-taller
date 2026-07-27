@@ -69,6 +69,10 @@
             <div class="emp-actions">
               <span class="bg" [ngClass]="u.activo ? 'bg-em' : 'bg-rd'">{{ u.activo ? 'Activo' : 'Inactivo' }}</span>
               <button class="btn btn-sm" [ngClass]="u.activo ? 'btn-rd' : 'btn-em'" (click)="toggle(u)">{{ u.activo ? 'Desactivar' : 'Activar' }}</button>
+              <button class="btn btn-sm btn-ou" (click)="eliminar(u)" [disabled]="eliminando === u.id"
+                      title="Eliminar definitivamente" aria-label="Eliminar empleado">
+                <ion-icon name="trash-outline"></ion-icon>
+              </button>
             </div>
           </div>
           <div class="empty" *ngIf="!usuarios.length"><ion-icon name="people-outline"></ion-icon><p>Sin empleados.</p></div>

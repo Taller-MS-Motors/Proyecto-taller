@@ -21,6 +21,12 @@ export class UsuariosService {
     return this.http.put<{ data: Usuario }>(`${this.url}/${id}`, data);
   }
 
+  // Borrado definitivo. El backend lo rechaza (409) si el empleado ya tiene
+  // historial: en ese caso corresponde desactivarlo, no eliminarlo.
+  eliminar(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.url}/${id}`);
+  }
+
   toggleActivo(id: number, activo: boolean): Observable<any> {
     return this.http.patch(`${this.url}/${id}/activo`, { activo });
   }

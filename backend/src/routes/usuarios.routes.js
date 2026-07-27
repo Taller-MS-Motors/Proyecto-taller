@@ -112,4 +112,46 @@ router.patch('/:id/sucursal', async (req, res) => {
   }
 });
 
+// DELETE /:id — elimina un empleado DEFINITIVAMENTE.
+// Solo se permite si no dejó rastro (citas, órdenes, avances, garantías, tareas o
+// mensajes): borrar a alguien con historial rompería la trazabilidad del taller y
+// las claves foráneas. En ese caso se responde 409 y se sugiere desactivarlo, que
+// es lo que corresponde para un empleado que ya trabajó y se fue.
+router.delete('/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    // Anti-lockout: nadie se borra a sí mismo.
+    if (id === req.usuario.id) {
+      return res.status(400).json({ error: 'No podés eliminar tu propia cuenta' });
+    }
+    const [[usuario]] = await pool.query('SELECT id, nombre FROM usuarios WHERE id = ?', [id]);
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const [[uso]] = await pool.query(
+      `SELECT
+         (SELECT COUNT(*) FROM citas WHERE usuario_id = ? OR tecnico_id = ?)
+       + (SELECT COUNT(*) FROM ordenes_trabajo WHERE recepcionista_id = ? OR tecnico_id = ?)
+       + (SELECT COUNT(*) FROM orden_avances WHERE usuario_id = ?)
+       + (SELECT COUNT(*) FROM garantias WHERE creado_por = ?)
+       + (SELECT COUNT(*) FROM tareas_mecanico WHERE tecnico_id = ? OR asignado_por = ?)
+       + (SELECT COUNT(*) FROM mensajes_internos WHERE remitente_id = ? OR destino_id = ?) AS total`,
+      [id, id, id, id, id, id, id, id, id, id]
+    );
+    if (uso && uso.total > 0) {
+      return res.status(409).json({
+        error: `${usuario.nombre} ya tiene trabajo registrado en el sistema, así que no se puede borrar sin perder el historial. Desactivalo: deja de tener acceso pero se conservan sus citas y órdenes.`,
+      });
+    }
+
+    await pool.query('DELETE FROM usuarios WHERE id = ?', [id]);
+    res.json({ message: 'Empleado eliminado' });
+  } catch (err) {
+    // Cualquier referencia que se nos haya escapado la frena la base de datos.
+    if (err.code === 'ER_ROW_IS_REFERENCED_2' || err.code === 'ER_ROW_IS_REFERENCED') {
+      return res.status(409).json({ error: 'No se puede eliminar: el empleado tiene registros asociados. Desactivalo en su lugar.' });
+    }
+    fail(res, err);
+  }
+});
+
 module.exports = router;
