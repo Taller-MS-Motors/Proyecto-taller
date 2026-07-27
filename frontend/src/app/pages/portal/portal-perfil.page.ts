@@ -188,6 +188,7 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
 
   async guardarCuenta() {
     if (!this.cuenta.nombre.trim() || !this.cuenta.apellido.trim()) { this.aviso('Nombre y apellido son requeridos', 'warning'); return; }
+    if (!this.cuenta.telefono.trim()) { this.aviso('El teléfono es requerido: es como te avisamos que tu moto está lista', 'warning'); return; }
     if (!this.cuenta.email.trim()) { this.aviso('El correo es requerido', 'warning'); return; }
 
     // El correo es con lo que se entra y con lo que se recupera la cuenta: cambiarlo

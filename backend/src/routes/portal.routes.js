@@ -596,6 +596,12 @@ router.put('/perfil', async (req, res) => {
     if (!email || !emailValido(email)) {
       return res.status(400).json({ error: 'El correo no tiene un formato válido' });
     }
+    // Obligatorio igual que en el registro: es la vía por la que el taller avisa que
+    // la moto está lista. Antes se podía vaciar desde el perfil y quedaba una cuenta
+    // sin teléfono aunque al registrarse hubiera sido requerido.
+    if (!telefono || !String(telefono).trim()) {
+      return res.status(400).json({ error: 'El teléfono es requerido' });
+    }
     if (!telefonoValido(telefono)) {
       return res.status(400).json({ error: 'El teléfono no tiene un formato válido' });
     }

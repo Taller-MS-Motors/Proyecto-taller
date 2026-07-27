@@ -130,6 +130,10 @@ router.patch('/:id/portal', requireRol('admin'), async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { nombre, apellido, telefono, email, cedula, direccion } = req.body;
+    // Obligatorio igual que al crear: sin esto se podía dar de alta un cliente con
+    // teléfono y después dejarlo en blanco al editarlo, y el taller se quedaba sin
+    // forma de avisarle que su moto está lista.
+    if (!telefono || !String(telefono).trim()) return res.status(400).json({ error: 'El teléfono es requerido' });
     if (!telefonoValido(telefono)) return res.status(400).json({ error: 'El teléfono no tiene un formato válido' });
     if (!cedulaValida(cedula)) return res.status(400).json({ error: 'La cédula no tiene un formato válido' });
     await pool.query(
