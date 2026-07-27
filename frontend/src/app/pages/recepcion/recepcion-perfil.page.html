@@ -81,6 +81,9 @@
         <button class="cta outline" [disabled]="guardandoPass" (click)="cambiarPassword()"><ion-icon name="lock-closed-outline"></ion-icon> Cambiar contraseña</button>
       </section>
 
+      <!-- Verificación en dos pasos (componente compartido) -->
+      <app-dosfa></app-dosfa>
+
       <button class="cta danger" (click)="logout()"><ion-icon name="log-out-outline"></ion-icon> Cerrar sesión</button>
     </ng-container>
 

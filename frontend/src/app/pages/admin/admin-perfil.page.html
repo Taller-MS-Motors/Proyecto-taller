@@ -86,81 +86,8 @@
         <button class="btn btn-ou btn-block" [disabled]="guardandoPass" (click)="cambiarPassword()">Cambiar contraseña</button>
       </div>
 
-      <!-- Verificación en dos pasos (TOTP) -->
-      <div class="cd mb dosfa">
-        <span class="cd-title">Verificación en dos pasos</span>
-
-        <!-- Estado actual -->
-        <div class="dosfa-estado" *ngIf="!alta2fa">
-          <span class="bg" [ngClass]="dosfa.activado ? 'bg-em' : 'bg-n'">
-            {{ dosfa.activado ? 'Activada' : 'Desactivada' }}
-          </span>
-          <p class="dosfa-txt" *ngIf="dosfa.activado">
-            Al entrar te pediremos un código de tu app de autenticación.
-            Te quedan <strong>{{ dosfa.backup_restantes }}</strong> códigos de respaldo.
-          </p>
-          <p class="dosfa-txt" *ngIf="!dosfa.activado">
-            Protegé tu cuenta con un código temporal además de la contraseña.
-            Si alguien te roba la clave, igual no puede entrar.
-          </p>
-        </div>
-
-        <!-- Activar: paso 1 (clave) + paso 2 (confirmar código) -->
-        <button class="btn btn-cr btn-block" *ngIf="!dosfa.activado && !alta2fa"
-                [disabled]="procesando2fa" (click)="iniciarAlta2fa()">
-          Activar verificación en dos pasos
-        </button>
-
-        <div class="dosfa-alta" *ngIf="alta2fa">
-          <p class="dosfa-paso"><strong>1.</strong> Agregá la cuenta a tu app de autenticación
-            (Google Authenticator, Authy, 1Password…).</p>
-
-          <a class="btn btn-ou btn-block dosfa-link" [href]="alta2fa.uri">
-            <ion-icon name="phone-portrait-outline"></ion-icon> Abrir en mi app de autenticación
-          </a>
-
-          <p class="dosfa-paso dosfa-manual">O agregala a mano con esta clave:</p>
-          <code class="dosfa-secreto">{{ alta2fa.secreto_legible }}</code>
-
-          <p class="dosfa-paso"><strong>2.</strong> Escribí el código de 6 dígitos que te muestra la app:</p>
-          <input class="dosfa-input" type="tel" inputmode="numeric" maxlength="6"
-                 [(ngModel)]="codigo2fa" placeholder="000000" (keyup.enter)="confirmarAlta2fa()">
-
-          <div class="dosfa-acciones">
-            <button class="btn btn-ou" (click)="cancelarAlta2fa()">Cancelar</button>
-            <button class="btn btn-cr" [disabled]="!codigo2fa || procesando2fa" (click)="confirmarAlta2fa()">
-              {{ procesando2fa ? 'Verificando…' : 'Confirmar y activar' }}
-            </button>
-          </div>
-        </div>
-
-        <!-- Códigos de respaldo: se muestran UNA sola vez -->
-        <div class="dosfa-respaldo" *ngIf="codigosRespaldo.length">
-          <p class="dosfa-alerta">
-            <ion-icon name="warning-outline"></ion-icon>
-            Guardá estos códigos en un lugar seguro. Son tu única forma de entrar si perdés
-            el teléfono, y <strong>no se vuelven a mostrar</strong>.
-          </p>
-          <div class="dosfa-codigos">
-            <code *ngFor="let c of codigosRespaldo">{{ c }}</code>
-          </div>
-          <button class="btn btn-ou btn-block" (click)="copiarRespaldo()">Copiar códigos</button>
-          <button class="btn btn-cr btn-block" (click)="codigosRespaldo = []">Ya los guardé</button>
-        </div>
-
-        <!-- Desactivar -->
-        <div class="dosfa-baja" *ngIf="dosfa.activado && !alta2fa && !codigosRespaldo.length">
-          <div class="fg pass-field">
-            <label>Contraseña (para desactivar)</label>
-            <div class="pass-wrap">
-              <input type="password" [(ngModel)]="passBaja2fa" placeholder="••••••••">
-            </div>
-          </div>
-          <button class="btn btn-rd btn-block" [disabled]="!passBaja2fa || procesando2fa" (click)="desactivar2fa()">
-            Desactivar
-          </button>
-        </div>
-      </div>
+      <!-- Verificacion en dos pasos (componente compartido) -->
+      <app-dosfa class="mb"></app-dosfa>
 
       <button class="btn btn-block logout-btn" (click)="logout()">Cerrar sesión</button>
     </ng-container>

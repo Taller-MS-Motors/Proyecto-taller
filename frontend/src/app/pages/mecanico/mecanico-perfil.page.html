@@ -115,6 +115,9 @@
         <button class="cta outline" [disabled]="guardandoPass" (click)="cambiarPassword()">Cambiar contraseña</button>
       </section>
 
+      <!-- Verificación en dos pasos (componente compartido) -->
+      <app-dosfa></app-dosfa>
+
       <!-- Calificaciones recientes -->
       <section class="card" *ngIf="perfil.calificaciones?.length">
         <span class="section-label">Calificaciones recientes</span>

@@ -1,0 +1,106 @@
+// Panel de verificación en dos pasos, embebido en los perfiles de los 3 roles.
+// Estilos autocontenidos con los tokens globales (los mismos que usan los
+// componentes de chat compartidos), para que se vea igual en el shell oscuro del
+// admin y en los claros de recepción/mecánico.
+.dosfa {
+  background: var(--ion-card-background);
+  border: 1px solid var(--hairline);
+  border-radius: 20px;
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.dosfa-titulo {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  font-size: 14px; font-weight: 800; color: var(--ion-text-color);
+  ion-icon { font-size: 19px; color: var(--ion-color-primary); }
+}
+
+.dosfa-chip {
+  display: inline-block; padding: 4px 12px; border-radius: 999px;
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+  background: var(--n-100, #f5f5f5); color: var(--n-500, #737373);
+  &.on { background: rgba(16, 185, 129, .12); color: #059669; }
+}
+
+.dosfa-txt {
+  font-size: 12.5px; color: var(--n-500, #737373); line-height: 1.55; margin: 10px 0 14px;
+  strong { color: var(--ion-text-color); }
+}
+
+.dosfa-paso {
+  font-size: 12.5px; color: var(--n-500, #737373); line-height: 1.55; margin: 14px 0 8px;
+  strong { color: var(--ion-color-primary); }
+  &.manual { margin-top: 16px; }
+}
+
+// Botones: mismo alto de toque en los 3 contextos, sin depender de clases del host.
+.dosfa-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%; min-height: 44px; padding: 11px 16px; margin-top: 8px;
+  border-radius: 14px; border: 1px solid transparent; cursor: pointer;
+  font-family: inherit; font-size: 13.5px; font-weight: 700; text-decoration: none;
+  transition: transform .15s;
+  ion-icon { font-size: 17px; }
+  &:active { transform: scale(.98); }
+  &:disabled { opacity: .5; cursor: default; }
+
+  &.primario { background: var(--ion-color-primary); color: #fff; }
+  &.secundario {
+    background: transparent; border-color: var(--hairline); color: var(--ion-text-color);
+  }
+  &.peligro { background: var(--ion-color-danger, #dc2626); color: #fff; }
+}
+
+// Clave para agregar la cuenta a mano: mono y espaciada, fácil de teclear.
+.dosfa-secreto {
+  display: block; text-align: center; user-select: all; word-break: break-all;
+  background: var(--n-50, #fafafa); border: 1px dashed var(--hairline); border-radius: 12px;
+  padding: 12px; font-family: var(--font-mono, monospace); font-size: 14px;
+  letter-spacing: 2px; color: var(--ion-text-color);
+}
+
+.dosfa-input {
+  width: 100%; box-sizing: border-box; margin-top: 4px;
+  padding: 12px; border: 1px solid var(--hairline); border-radius: 12px;
+  background: var(--ion-card-background); color: var(--ion-text-color); outline: none;
+  font-family: var(--font-mono, monospace); font-size: 22px; font-weight: 700;
+  letter-spacing: 6px; text-align: center;
+  &:focus { border-color: var(--ion-color-primary); }
+}
+
+.dosfa-acciones {
+  display: flex; gap: 8px;
+  .dosfa-btn { flex: 1; }
+}
+
+// Códigos de respaldo: se ven una sola vez, así que van bien destacados.
+.dosfa-alerta {
+  display: flex; align-items: flex-start; gap: 8px; margin: 0 0 12px;
+  background: rgba(245, 158, 11, .1); border: 1px solid rgba(245, 158, 11, .3);
+  border-radius: 12px; padding: 12px 14px;
+  font-size: 12.5px; color: var(--n-600, #525252); line-height: 1.5;
+  ion-icon { font-size: 18px; color: var(--amber-600, #d97706); flex-shrink: 0; margin-top: 1px; }
+  strong { color: var(--ion-text-color); }
+}
+
+.dosfa-codigos {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 4px;
+  code {
+    background: var(--n-50, #fafafa); border: 1px solid var(--hairline); border-radius: 10px;
+    padding: 10px; text-align: center; user-select: all;
+    font-family: var(--font-mono, monospace); font-size: 13.5px; color: var(--ion-text-color);
+  }
+}
+
+.dosfa-baja { margin-top: 6px; }
+.dosfa-label {
+  display: block; font-size: 12px; font-weight: 600; color: var(--n-500, #737373); margin-bottom: 6px;
+}
+.dosfa-pass {
+  width: 100%; box-sizing: border-box;
+  padding: 11px 14px; border: 1px solid var(--hairline); border-radius: 12px;
+  background: var(--ion-card-background); color: var(--ion-text-color); outline: none;
+  font-family: inherit; font-size: 14px;
+  &:focus { border-color: var(--ion-color-primary); }
+}

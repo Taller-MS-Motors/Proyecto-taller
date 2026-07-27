@@ -28,14 +28,6 @@ export class AdminPerfilPage implements OnInit, OnDestroy {
   verActual = false;
   verNueva = false;
 
-  // Verificación en dos pasos (TOTP).
-  dosfa = { activado: false, backup_restantes: 0 };
-  alta2fa: { secreto: string; secreto_legible: string; uri: string } | null = null;
-  codigo2fa = '';
-  passBaja2fa = '';
-  procesando2fa = false;
-  codigosRespaldo: string[] = [];   // solo en memoria: se muestran una única vez
-
   readonly nivelesTexto = [
     { i: 0, etiqueta: 'A', nombre: 'Normal' },
     { i: 1, etiqueta: 'A', nombre: 'Grande' },
@@ -68,71 +60,6 @@ export class AdminPerfilPage implements OnInit, OnDestroy {
     this.dash.getResumen().pipe(takeUntil(this.destroy$)).subscribe({
       next: r => this.resumen = { ...this.resumen, ...r.data },
     });
-    this.cargar2fa();
-  }
-
-  // ── Verificación en dos pasos ──
-  private cargar2fa() {
-    this.auth.estado2FA().pipe(takeUntil(this.destroy$)).subscribe({
-      next: r => this.dosfa = r.data,
-      error: () => {},
-    });
-  }
-
-  // Paso 1: pide la clave y muestra las instrucciones para la app de autenticación.
-  iniciarAlta2fa() {
-    this.procesando2fa = true;
-    this.codigo2fa = '';
-    this.auth.setup2FA().pipe(takeUntil(this.destroy$)).subscribe({
-      next: r => { this.alta2fa = r.data; this.procesando2fa = false; },
-      error: e => { this.procesando2fa = false; this.aviso(e.error?.error || 'No se pudo iniciar', 'danger'); },
-    });
-  }
-
-  cancelarAlta2fa() {
-    this.alta2fa = null;
-    this.codigo2fa = '';
-  }
-
-  // Paso 2: confirma con un código real y activa. Devuelve los códigos de respaldo.
-  confirmarAlta2fa() {
-    const codigo = this.codigo2fa.trim();
-    if (!codigo || this.procesando2fa) return;
-    this.procesando2fa = true;
-    this.auth.activar2FA(codigo).pipe(takeUntil(this.destroy$)).subscribe({
-      next: r => {
-        this.procesando2fa = false;
-        this.alta2fa = null;
-        this.codigo2fa = '';
-        this.codigosRespaldo = r.data.codigos_respaldo;
-        this.cargar2fa();
-        this.aviso('Verificación en dos pasos activada');
-      },
-      error: e => { this.procesando2fa = false; this.aviso(e.error?.error || 'No se pudo activar', 'danger'); },
-    });
-  }
-
-  desactivar2fa() {
-    if (!this.passBaja2fa || this.procesando2fa) return;
-    this.procesando2fa = true;
-    this.auth.desactivar2FA(this.passBaja2fa).pipe(takeUntil(this.destroy$)).subscribe({
-      next: () => {
-        this.procesando2fa = false;
-        this.passBaja2fa = '';
-        this.cargar2fa();
-        this.aviso('Verificación en dos pasos desactivada');
-      },
-      error: e => { this.procesando2fa = false; this.aviso(e.error?.error || 'No se pudo desactivar', 'danger'); },
-    });
-  }
-
-  async copiarRespaldo() {
-    try {
-      await navigator.clipboard.writeText(this.codigosRespaldo.join('\n'));
-      this.aviso('Códigos copiados');
-    } catch {
-      this.aviso('No se pudo copiar. Anotalos a mano.', 'warning');
-    }
   }
 
   get iniciales(): string {

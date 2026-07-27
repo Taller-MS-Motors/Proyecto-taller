@@ -1,0 +1,73 @@
+<div class="dosfa">
+  <div class="dosfa-titulo">
+    <ion-icon name="shield-checkmark-outline"></ion-icon>
+    <span>Verificación en dos pasos</span>
+  </div>
+
+  <!-- Estado actual -->
+  <div class="dosfa-estado" *ngIf="!alta && !codigosRespaldo.length">
+    <span class="dosfa-chip" [class.on]="estado.activado">
+      {{ estado.activado ? 'Activada' : 'Desactivada' }}
+    </span>
+    <p class="dosfa-txt" *ngIf="estado.activado">
+      Al entrar te pediremos un código de tu app de autenticación.
+      Te quedan <strong>{{ estado.backup_restantes }}</strong> códigos de respaldo.
+    </p>
+    <p class="dosfa-txt" *ngIf="!estado.activado">
+      Protegé tu cuenta con un código temporal además de la contraseña.
+      Si alguien te roba la clave, igual no puede entrar.
+    </p>
+  </div>
+
+  <!-- Activar -->
+  <button type="button" class="dosfa-btn primario" *ngIf="!estado.activado && !alta && !codigosRespaldo.length"
+          [disabled]="procesando" (click)="iniciar()">
+    Activar verificación en dos pasos
+  </button>
+
+  <div class="dosfa-alta" *ngIf="alta">
+    <p class="dosfa-paso"><strong>1.</strong> Agregá la cuenta a tu app de autenticación
+      (Google Authenticator, Authy, 1Password…).</p>
+
+    <a class="dosfa-btn secundario" [href]="alta.uri">
+      <ion-icon name="phone-portrait-outline"></ion-icon> Abrir en mi app de autenticación
+    </a>
+
+    <p class="dosfa-paso manual">O agregala a mano con esta clave:</p>
+    <code class="dosfa-secreto">{{ alta.secreto_legible }}</code>
+
+    <p class="dosfa-paso"><strong>2.</strong> Escribí el código de 6 dígitos que te muestra la app:</p>
+    <input class="dosfa-input" type="tel" inputmode="numeric" maxlength="6"
+           [(ngModel)]="codigo" placeholder="000000" (keyup.enter)="confirmar()">
+
+    <div class="dosfa-acciones">
+      <button type="button" class="dosfa-btn secundario" (click)="cancelar()">Cancelar</button>
+      <button type="button" class="dosfa-btn primario" [disabled]="!codigo || procesando" (click)="confirmar()">
+        {{ procesando ? 'Verificando…' : 'Confirmar y activar' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Códigos de respaldo: se muestran UNA sola vez -->
+  <div class="dosfa-respaldo" *ngIf="codigosRespaldo.length">
+    <p class="dosfa-alerta">
+      <ion-icon name="warning-outline"></ion-icon>
+      <span>Guardá estos códigos en un lugar seguro. Son tu única forma de entrar si perdés
+        el teléfono, y <strong>no se vuelven a mostrar</strong>.</span>
+    </p>
+    <div class="dosfa-codigos">
+      <code *ngFor="let c of codigosRespaldo">{{ c }}</code>
+    </div>
+    <button type="button" class="dosfa-btn secundario" (click)="copiarRespaldo()">Copiar códigos</button>
+    <button type="button" class="dosfa-btn primario" (click)="codigosRespaldo = []">Ya los guardé</button>
+  </div>
+
+  <!-- Desactivar -->
+  <div class="dosfa-baja" *ngIf="estado.activado && !alta && !codigosRespaldo.length">
+    <label class="dosfa-label">Contraseña (para desactivar)</label>
+    <input class="dosfa-pass" type="password" [(ngModel)]="passBaja" placeholder="••••••••">
+    <button type="button" class="dosfa-btn peligro" [disabled]="!passBaja || procesando" (click)="desactivar()">
+      Desactivar
+    </button>
+  </div>
+</div>
