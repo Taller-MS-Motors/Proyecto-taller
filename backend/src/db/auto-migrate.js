@@ -166,6 +166,10 @@ async function ensureSchema() {
     // no_show: el job diario marca las citas vencidas nunca atendidas (no las cancela ni borra).
     await addColumnIfMissing('citas', 'recordatorio_enviado', 'TINYINT(1) NOT NULL DEFAULT 0');
     await addColumnIfMissing('citas', 'no_show', 'TINYINT(1) NOT NULL DEFAULT 0');
+    // Cancelación hecha por el cliente desde el portal: sin esto el taller no se
+    // enteraba (la cita simplemente desaparecía de la agenda). Alimenta la alerta
+    // 'cita_cancelada' de recepción.
+    await addColumnIfMissing('citas', 'fecha_cancelacion', 'DATETIME NULL');
 
     // Nuevos estados de la cita (flujo que ve el cliente en el portal).
     // Idempotente: solo migra si el enum todavía tiene los estados viejos.

@@ -1197,7 +1197,9 @@ router.patch('/citas/:id/cancelar', async (req, res) => {
     if (minH > 0 && horasHastaCita(cita.fecha, cita.hora) < minH) {
       return res.status(400).json({ error: `No se puede cancelar con menos de ${minH} h de anticipación. Comunicate con el taller.` });
     }
-    await pool.query("UPDATE citas SET estado = 'cancelado' WHERE id = ?", [req.params.id]);
+    // fecha_cancelacion deja rastro del momento: es lo que hace visible la
+    // cancelación en las alertas de recepción (antes la cita desaparecía en silencio).
+    await pool.query("UPDATE citas SET estado = 'cancelado', fecha_cancelacion = NOW() WHERE id = ?", [req.params.id]);
     res.json({ message: 'Cita cancelada' });
   } catch (err) {
     fail(res, err);

@@ -107,7 +107,8 @@ async function notificarCortesia(clienteId) {
 // Avisa al cliente que el taller le agendó una cita desde el mostrador. Hasta ahora
 // al crear una cita solo se notificaba al mecánico asignado: el cliente no recibía
 // nada en su campana. (Cuando la agenda él mismo desde el portal no hace falta.)
-async function notificarCitaAgendada(citaId) {
+// `reprogramada`: el taller le movió la fecha/hora a una cita que ya existía.
+async function notificarCitaAgendada(citaId, { reprogramada = false } = {}) {
   try {
     const config = await getConfig();
     if (!config.notif_estado) return;
@@ -129,8 +130,12 @@ async function notificarCitaAgendada(citaId) {
     await crearNotificacion({
       cliente_id: cita.cliente_id,
       cita_id: citaId,
-      titulo: `Cita agendada: ${cita.fecha} a las ${cita.hora}`,
-      mensaje: `El taller te agendó una cita para ${servicio} (${moto}) el ${cita.fecha} a las ${cita.hora}.`,
+      titulo: reprogramada
+        ? `Cita reprogramada: ${cita.fecha} a las ${cita.hora}`
+        : `Cita agendada: ${cita.fecha} a las ${cita.hora}`,
+      mensaje: reprogramada
+        ? `El taller movió tu cita de ${servicio} (${moto}) al ${cita.fecha} a las ${cita.hora}.`
+        : `El taller te agendó una cita para ${servicio} (${moto}) el ${cita.fecha} a las ${cita.hora}.`,
       tipo: 'agendado',
     });
   } catch (err) {

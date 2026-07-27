@@ -154,6 +154,8 @@ export class RecepcionAgendaPage implements OnInit, OnDestroy {
   // Badges del cliente en la fila de cita.
   llego(c: any): boolean { return c.estado === 'agendado' && !!c.hora_llegada; }
   sinConfirmar(c: any): boolean { return c.estado === 'agendado' && !c.confirmada_cliente && !c.hora_llegada; }
+  // El job diario marca no_show las citas vencidas que nunca tuvieron check-in.
+  noShow(c: any): boolean { return c.estado === 'agendado' && !!c.no_show; }
 
   // Tap en una cita: abre su orden si la tiene, si no la ficha del cliente.
   abrirCita(c: any) {

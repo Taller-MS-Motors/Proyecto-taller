@@ -119,6 +119,7 @@
 }
 .badge.llego { background: var(--emerald-50); color: var(--emerald-700); }
 .badge.sin { background: var(--amber-100); color: var(--amber-700); }
+.badge.noshow { background: var(--rose-100, #ffe4e6); color: var(--rose-700, #be123c); }
 .ci-wa {
   flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px; border: none; cursor: pointer;
   background: rgba(37, 211, 102, .14); color: #25d366;
