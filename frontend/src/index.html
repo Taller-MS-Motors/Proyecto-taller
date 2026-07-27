@@ -75,6 +75,10 @@
       0%, 6% { opacity: 0; transform: scale(.94); }
       22%, 100% { opacity: 1; transform: scale(1); }
     }
+    /* Recarga (misma sesión, ver script abajo): la animación corre más rápido —
+       ya viste el arranque completo hace un momento, no hace falta repetirlo entero. */
+    #boot-splash.recarga .boot-glow { animation-duration: .9s; }
+    #boot-splash.recarga .boot-mark { animation-duration: .9s; }
     @media (prefers-reduced-motion: reduce) {
       .boot-glow, .boot-mark { animation-duration: .01ms !important; }
     }
@@ -90,11 +94,22 @@
     (function () {
       var el = document.getElementById('boot-splash');
       if (!el) return;
+      // Primera carga de la sesión = apertura real de la app (respiro completo,
+      // 1.6s). Si sessionStorage ya tenía la marca, es una recarga (F5, o volver a
+      // cargar sin cerrar del todo la app): más corta, 0.9s. Se decide ANTES de que
+      // arranque la animación, para que CSS y el mínimo de espera queden en sync.
+      var esRecarga = false;
+      try {
+        esRecarga = sessionStorage.getItem('tallerms_boot_visto') === '1';
+        sessionStorage.setItem('tallerms_boot_visto', '1');
+      } catch (e) { /* modo privado sin sessionStorage: siempre cuenta como apertura */ }
+      if (esRecarga) el.classList.add('recarga');
+
       var inicio = Date.now();
       // En el teléfono, con los assets locales, Angular puede arrancar y navegar
       // casi al instante — sin este mínimo, la animación se corta a mitad y se
       // siente como un parpadeo. Se sostiene lo que falte para completar el respiro.
-      var MOSTRAR_MIN_MS = 1600;
+      var MOSTRAR_MIN_MS = esRecarga ? 900 : 1600;
       var hidden = false;
       function ocultarYa() {
         if (hidden) return;
