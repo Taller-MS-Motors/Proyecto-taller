@@ -11,7 +11,10 @@ const {
 const MAX_MOTIVO = 1000;
 const MAX_MOTIVO_RECHAZO = 1000;
 const { consumir } = require('../utils/rate-limit');
-const { enviarCodigoReset, enviarCodigoLogin, enviarCodigoVerificacion } = require('../services/mailer');
+const {
+  enviarCodigoReset, enviarCodigoLogin, enviarCodigoVerificacion,
+  enviarCodigoCambioCorreo, enviarAvisoCambioCorreo,
+} = require('../services/mailer');
 const { antibot } = require('../utils/antibot');
 const { SERVICIOS } = require('../utils/servicios');
 const { getConfig, horasDisponibles } = require('../utils/configuracion');
@@ -82,15 +85,41 @@ router.post('/login', async (req, res) => {
 
 // Genera, guarda y envía un código de verificación de correo (10 min, un solo uso).
 // Invalida los códigos previos del cliente para que solo el último sea válido.
-async function enviarVerificacion(clienteId, email, nombre) {
+// El propósito separa dos códigos que conviven: el de estrenar la cuenta y el de mudar
+// el correo desde el perfil. Sin distinguirlos, pedir uno anularía el otro.
+async function nuevoCodigoVerificacion(clienteId, proposito) {
   const codigo = String(Math.floor(100000 + Math.random() * 900000)); // 6 dígitos
   const codeHash = await bcrypt.hash(codigo, 10);
-  await pool.query('UPDATE email_verify_codes SET used = 1 WHERE cliente_id = ? AND used = 0', [clienteId]);
   await pool.query(
-    'INSERT INTO email_verify_codes (cliente_id, code_hash, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
-    [clienteId, codeHash]
+    'UPDATE email_verify_codes SET used = 1 WHERE cliente_id = ? AND proposito = ? AND used = 0',
+    [clienteId, proposito]
   );
+  await pool.query(
+    `INSERT INTO email_verify_codes (cliente_id, code_hash, proposito, expires_at)
+     VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
+    [clienteId, codeHash, proposito]
+  );
+  return codigo;
+}
+
+async function enviarVerificacion(clienteId, email, nombre) {
+  const codigo = await nuevoCodigoVerificacion(clienteId, 'registro');
   await enviarCodigoVerificacion(email, nombre, codigo);
+}
+
+// Código a la dirección NUEVA para confirmar un cambio de correo desde el perfil.
+async function enviarCodigoCambio(clienteId, emailNuevo, nombre) {
+  const codigo = await nuevoCodigoVerificacion(clienteId, 'cambio');
+  await enviarCodigoCambioCorreo(emailNuevo, nombre, codigo);
+}
+
+// ¿Otra cuenta ya tiene ese correo, o lo tiene reservado como pendiente?
+async function correoOcupado(email, exceptoId) {
+  const [[dup]] = await pool.query(
+    'SELECT id FROM clientes WHERE (email = ? OR email_pendiente = ?) AND id <> ? AND activo = 1',
+    [email, email, exceptoId]
+  );
+  return !!dup;
 }
 
 // POST /api/portal/registro — auto-registro del cliente (público). NO abre sesión:
@@ -171,7 +200,7 @@ router.post('/registro/verificar', async (req, res) => {
 
     const [[reg]] = await pool.query(
       `SELECT id, code_hash, attempts FROM email_verify_codes
-       WHERE cliente_id = ? AND used = 0 AND expires_at > NOW()
+       WHERE cliente_id = ? AND proposito = 'registro' AND used = 0 AND expires_at > NOW()
        ORDER BY created_at DESC LIMIT 1`,
       [cliente.id]
     );
@@ -545,7 +574,9 @@ router.delete('/notificaciones/:id', async (req, res) => {
 router.get('/perfil', async (req, res) => {
   try {
     const [[c]] = await pool.query(
-      'SELECT id, nombre, apellido, email, telefono, cedula, foto, notif_avances, notif_recordatorios FROM clientes WHERE id = ? AND activo = 1',
+      `SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula, foto,
+              notif_avances, notif_recordatorios
+       FROM clientes WHERE id = ? AND activo = 1`,
       [req.cliente.id]
     );
     if (!c) return res.status(404).json({ error: 'Cuenta no encontrada' });
@@ -568,22 +599,152 @@ router.put('/perfil', async (req, res) => {
     if (!telefonoValido(telefono)) {
       return res.status(400).json({ error: 'El teléfono no tiene un formato válido' });
     }
-    // El correo es la llave de login: no permitir chocar con otra cuenta.
-    const [[dup]] = await pool.query(
-      'SELECT id FROM clientes WHERE email = ? AND id <> ? AND activo = 1',
-      [email.trim(), req.cliente.id]
+    const [[actual]] = await pool.query(
+      'SELECT nombre, email, password_hash FROM clientes WHERE id = ?', [req.cliente.id]
     );
-    if (dup) return res.status(409).json({ error: 'Ese correo ya está en uso por otra cuenta' });
+    if (!actual) return res.status(404).json({ error: 'Cuenta no encontrada' });
 
+    const emailNuevo = email.trim();
+    const cambiaCorreo = emailNuevo.toLowerCase() !== String(actual.email || '').toLowerCase();
+
+    // El correo es harina de otro costal: es con lo que se entra y con lo que se
+    // recupera la contraseña. Cambiarlo de una sola pasada convertía una sesión robada
+    // en un robo definitivo de la cuenta (el ladrón se lleva los códigos de
+    // recuperación y el dueño ya no puede volver). Por eso van dos candados:
+    //   1. hay que saber la contraseña actual, que un token robado no da;
+    //   2. la dirección nueva queda PENDIENTE hasta confirmarse con un código.
+    // Mientras tanto la cuenta sigue funcionando con el correo viejo, así que un
+    // error de tipeo no encierra a nadie afuera.
+    if (cambiaCorreo) {
+      const { password } = req.body;
+      if (!password) {
+        return res.status(400).json({ error: 'Para cambiar el correo, escribí tu contraseña actual', requiere_password: true });
+      }
+      if (!actual.password_hash || !(await bcrypt.compare(password, actual.password_hash))) {
+        return res.status(401).json({ error: 'La contraseña actual no es correcta' });
+      }
+
+      const limite = consumir(`cambio-correo:${req.cliente.id}`, { porMinuto: 2, porHora: 10 });
+      if (!limite.ok) {
+        return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
+      }
+
+      // No puede pisar la cuenta de otro, ni el correo ya en uso ni uno que otro tenga
+      // reservado como pendiente (se vuelve a comprobar al confirmar, por si acaso).
+      if (await correoOcupado(emailNuevo, req.cliente.id)) {
+        return res.status(409).json({ error: 'Ese correo ya está en uso por otra cuenta' });
+      }
+
+      await pool.query('UPDATE clientes SET email_pendiente = ? WHERE id = ?', [emailNuevo, req.cliente.id]);
+      await enviarCodigoCambio(req.cliente.id, emailNuevo, actual.nombre);
+      // Al correo viejo le avisamos aunque el cambio no esté hecho: si le robaron la
+      // sesión, ese aviso es la única forma de que el dueño se entere a tiempo.
+      await enviarAvisoCambioCorreo(actual.email, actual.nombre, emailNuevo);
+    }
+
+    // Recién acá se tocan los demás datos: si el cambio de correo se rechazó por
+    // contraseña incorrecta, no queremos haber guardado el nombre a medias.
     await pool.query(
-      'UPDATE clientes SET nombre = ?, apellido = ?, telefono = ?, email = ? WHERE id = ?',
-      [nombre.trim(), apellido.trim(), (telefono || '').trim() || null, email.trim(), req.cliente.id]
+      'UPDATE clientes SET nombre = ?, apellido = ?, telefono = ? WHERE id = ?',
+      [nombre.trim(), apellido.trim(), (telefono || '').trim() || null, req.cliente.id]
     );
+
     const [[c]] = await pool.query(
-      'SELECT id, nombre, apellido, email, telefono, cedula FROM clientes WHERE id = ?',
+      'SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula FROM clientes WHERE id = ?',
       [req.cliente.id]
     );
-    res.json({ data: c, message: 'Perfil actualizado' });
+    res.json({
+      data: c,
+      cambio_correo_pendiente: cambiaCorreo,
+      message: cambiaCorreo
+        ? `Te enviamos un código a ${emailNuevo}. Hasta que lo confirmes seguís entrando con tu correo actual.`
+        : 'Perfil actualizado',
+    });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/portal/perfil/email/confirmar — aplica el cambio de correo pendiente.
+router.post('/perfil/email/confirmar', async (req, res) => {
+  try {
+    const { codigo } = req.body;
+    if (!codigo) return res.status(400).json({ error: 'El código es requerido' });
+
+    const [[c]] = await pool.query(
+      'SELECT nombre, email, email_pendiente FROM clientes WHERE id = ? AND activo = 1', [req.cliente.id]
+    );
+    if (!c || !c.email_pendiente) return res.status(400).json({ error: 'No hay ningún cambio de correo pendiente' });
+
+    const limite = consumir(`cambio-correo-verificar:${req.cliente.id}`, { porMinuto: 5, porHora: 20 });
+    if (!limite.ok) {
+      return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
+    }
+
+    const ERR_CODIGO = 'Código inválido o expirado';
+    const [[reg]] = await pool.query(
+      `SELECT id, code_hash, attempts FROM email_verify_codes
+       WHERE cliente_id = ? AND proposito = 'cambio' AND used = 0 AND expires_at > NOW()
+       ORDER BY created_at DESC LIMIT 1`,
+      [req.cliente.id]
+    );
+    if (!reg || reg.attempts >= 5) return res.status(400).json({ error: ERR_CODIGO });
+
+    if (!(await bcrypt.compare(String(codigo).trim(), reg.code_hash))) {
+      await pool.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      return res.status(400).json({ error: ERR_CODIGO });
+    }
+
+    // Se vuelve a comprobar acá: entre el pedido y la confirmación alguien más pudo
+    // haberse quedado con ese correo.
+    if (await correoOcupado(c.email_pendiente, req.cliente.id)) {
+      await pool.query('UPDATE clientes SET email_pendiente = NULL WHERE id = ?', [req.cliente.id]);
+      return res.status(409).json({ error: 'Ese correo ya está en uso por otra cuenta' });
+    }
+
+    await pool.query('UPDATE email_verify_codes SET used = 1 WHERE id = ?', [reg.id]);
+    await pool.query(
+      'UPDATE clientes SET email = email_pendiente, email_verificado = 1, email_pendiente = NULL WHERE id = ?',
+      [req.cliente.id]
+    );
+
+    const [[actualizado]] = await pool.query(
+      'SELECT id, nombre, apellido, email, email_pendiente, telefono, cedula FROM clientes WHERE id = ?',
+      [req.cliente.id]
+    );
+    res.json({ data: actualizado, message: 'Listo, ese ya es tu correo. Usalo la próxima vez que entres.' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/portal/perfil/email/reenviar — otro código a la dirección pendiente.
+router.post('/perfil/email/reenviar', async (req, res) => {
+  try {
+    const [[c]] = await pool.query(
+      'SELECT nombre, email_pendiente FROM clientes WHERE id = ? AND activo = 1', [req.cliente.id]
+    );
+    if (!c || !c.email_pendiente) return res.status(400).json({ error: 'No hay ningún cambio de correo pendiente' });
+
+    const limite = consumir(`cambio-correo:${req.cliente.id}`, { porMinuto: 2, porHora: 10 });
+    if (!limite.ok) {
+      return res.status(429).json({ error: `Esperá ${limite.retryAfter}s antes de pedir otro código.` });
+    }
+
+    await enviarCodigoCambio(req.cliente.id, c.email_pendiente, c.nombre);
+    res.json({ message: `Te enviamos otro código a ${c.email_pendiente}.` });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// DELETE /api/portal/perfil/email — descarta el cambio pendiente (se equivocó al escribir,
+// o el dueño real recibió el aviso y quiere frenarlo).
+router.delete('/perfil/email', async (req, res) => {
+  try {
+    await pool.query("UPDATE email_verify_codes SET used = 1 WHERE cliente_id = ? AND proposito = 'cambio' AND used = 0", [req.cliente.id]);
+    await pool.query('UPDATE clientes SET email_pendiente = NULL WHERE id = ?', [req.cliente.id]);
+    res.json({ message: 'Cambio de correo cancelado' });
   } catch (err) {
     fail(res, err);
   }

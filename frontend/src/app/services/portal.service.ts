@@ -298,8 +298,25 @@ export class PortalService {
     return this.http.get<{ data: any }>(`${this.url}/perfil`);
   }
 
-  updateMiPerfil(data: { nombre: string; apellido: string; telefono: string; email: string }): Observable<{ data: any }> {
-    return this.http.put<{ data: any }>(`${this.url}/perfil`, data);
+  // `password` solo hace falta si cambia el correo: el backend lo exige para eso.
+  // La respuesta trae cambio_correo_pendiente cuando el correo quedó a la espera.
+  updateMiPerfil(data: { nombre: string; apellido: string; telefono: string; email: string; password?: string }):
+    Observable<{ data: any; cambio_correo_pendiente?: boolean; message?: string }> {
+    return this.http.put<{ data: any; cambio_correo_pendiente?: boolean; message?: string }>(`${this.url}/perfil`, data);
+  }
+
+  // —— Cambio de correo en dos pasos ——
+  // El correo nuevo no reemplaza al viejo hasta confirmarse con el código.
+  confirmarCambioCorreo(codigo: string): Observable<{ data: any; message?: string }> {
+    return this.http.post<{ data: any; message?: string }>(`${this.url}/perfil/email/confirmar`, { codigo });
+  }
+
+  reenviarCambioCorreo(): Observable<{ message?: string }> {
+    return this.http.post<{ message?: string }>(`${this.url}/perfil/email/reenviar`, {});
+  }
+
+  cancelarCambioCorreo(): Observable<{ message?: string }> {
+    return this.http.delete<{ message?: string }>(`${this.url}/perfil/email`);
   }
 
   // Preferencias de notificación del cliente (avisos de avance / recordatorios).

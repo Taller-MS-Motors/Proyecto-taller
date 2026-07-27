@@ -150,6 +150,38 @@ function plantillaCodigoVerificacion(nombre, codigo) {
   return envoltorio('Taller MS', 'Confirmá tu correo', cuerpo);
 }
 
+// Confirmación de la dirección NUEVA al cambiar el correo desde el perfil.
+// Va dirigido a la dirección nueva: recibirlo es justamente la prueba de que existe.
+function plantillaCambioCorreo(nombre, codigo) {
+  const cuerpo = `
+    ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, pediste cambiar el correo de tu cuenta a esta dirección. Confirmá con este código, que vence en 10 minutos.`)}
+    <div style="text-align:center;padding:12px 0 8px;">
+      <div style="display:inline-block;background:#0a0a0a;border:1px solid #be123c;border-radius:16px;padding:18px 28px;">
+        <span style="color:#fafafa;font-size:38px;font-weight:700;letter-spacing:10px;font-family:'JetBrains Mono','Courier New',monospace;">${escapar(codigo)}</span>
+      </div>
+    </div>
+    <p style="color:#737373;font-size:12px;line-height:1.5;margin:12px 0 0;">
+      Hasta que confirmes, tu cuenta sigue usando el correo anterior. Si no pediste este
+      cambio, ignorá este mensaje: sin el código no se cambia nada.
+    </p>`;
+  return envoltorio('Taller MS', 'Confirmá tu correo nuevo', cuerpo);
+}
+
+// Aviso a la dirección ANTERIOR de que alguien pidió mudar la cuenta. No lleva código:
+// su único fin es que el dueño real se entere a tiempo si le robaron la sesión.
+function plantillaAvisoCambioCorreo(nombre, emailNuevo) {
+  const cuerpo = `
+    ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, se pidió cambiar el correo de tu cuenta a <strong style="color:#fafafa;">${escapar(emailNuevo)}</strong>.`)}
+    ${parrafo('Si fuiste vos, no tenés que hacer nada: confirmá con el código que enviamos a esa dirección.')}
+    <div style="background:#0a0a0a;border:1px solid #be123c;border-radius:16px;padding:16px 20px;margin:8px 0 4px;">
+      <p style="color:#fafafa;font-size:14px;line-height:1.6;margin:0;">
+        <strong>Si no fuiste vos</strong>, entrá ya mismo y cambiá tu contraseña: alguien podría
+        tener acceso a tu cuenta. Mientras no se confirme, este correo sigue siendo el válido.
+      </p>
+    </div>`;
+  return envoltorio('Taller MS', 'Pidieron cambiar tu correo', cuerpo);
+}
+
 function plantillaRecordatorio({ nombre, hora, servicio, moto, sucursal, taller }) {
   const donde = sucursal ? ` en ${escapar(sucursal)}` : '';
   const cuerpo = `
@@ -206,6 +238,26 @@ async function enviarCodigoVerificacion(email, nombre, codigo) {
   });
 }
 
+// Código a la dirección nueva para confirmar un cambio de correo desde el perfil.
+async function enviarCodigoCambioCorreo(emailNuevo, nombre, codigo) {
+  return enviarCorreo({
+    to: emailNuevo,
+    subject: 'Confirmá tu correo nuevo',
+    html: plantillaCambioCorreo(nombre, codigo),
+    devLog: `Código de cambio de correo para ${emailNuevo}: ${codigo}`,
+  });
+}
+
+// Aviso a la dirección anterior. Que falle no debe frenar el cambio: es informativo.
+async function enviarAvisoCambioCorreo(emailAnterior, nombre, emailNuevo) {
+  return enviarCorreo({
+    to: emailAnterior,
+    subject: 'Pidieron cambiar el correo de tu cuenta',
+    html: plantillaAvisoCambioCorreo(nombre, emailNuevo),
+    devLog: `Aviso de cambio de correo a ${emailAnterior} (nuevo: ${emailNuevo})`,
+  });
+}
+
 // Recordatorio de la cita del día siguiente.
 async function enviarRecordatorioCita(email, datos) {
   return enviarCorreo({
@@ -228,5 +280,6 @@ async function enviarAvisoEstado(email, datos) {
 
 module.exports = {
   enviarCorreo, enviarCodigoReset, enviarCodigoLogin, enviarCodigoVerificacion,
+  enviarCodigoCambioCorreo, enviarAvisoCambioCorreo,
   enviarRecordatorioCita, enviarAvisoEstado,
 };

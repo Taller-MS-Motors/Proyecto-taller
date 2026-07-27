@@ -63,3 +63,70 @@ test('enviarCorreo sin destinatario devuelve false', async () => {
   const ok = await enviarCorreo({ to: '', subject: 'x', html: '<p>x</p>' });
   assert.equal(ok, false);
 });
+
+// Cambio de correo: el código va a la dirección NUEVA (recibirlo es la prueba de que
+// existe) y el aviso a la ANTERIOR (para que el dueño real se entere si le robaron la
+// sesión). Confundir los destinatarios rompería justamente la protección.
+test('el codigo de cambio va al correo nuevo y el aviso al viejo', async () => {
+  const prevKey = process.env.RESEND_API_KEY;
+  process.env.RESEND_API_KEY = 'fake';
+  process.env.RAILWAY_PUBLIC_DOMAIN = 'ejemplo.test';
+
+  const fetchOriginal = global.fetch;
+  const enviados = [];
+  global.fetch = async (_url, opts) => { enviados.push(JSON.parse(opts.body)); return { ok: true }; };
+
+  const origWarn = console.warn;
+  console.warn = () => {};
+
+  try {
+    const { enviarCodigoCambioCorreo, enviarAvisoCambioCorreo } = require('../src/services/mailer');
+    await enviarCodigoCambioCorreo('nuevo@correo.com', 'Ana', '482913');
+    await enviarAvisoCambioCorreo('viejo@correo.com', 'Ana', 'nuevo@correo.com');
+
+    const [codigo, aviso] = enviados;
+    assert.deepEqual(codigo.to, ['nuevo@correo.com']);
+    assert.ok(codigo.html.includes('482913'), 'el correo nuevo debe llevar el codigo');
+
+    assert.deepEqual(aviso.to, ['viejo@correo.com']);
+    assert.ok(!aviso.html.includes('482913'), 'el aviso al correo viejo NO debe llevar el codigo');
+    assert.ok(aviso.html.includes('nuevo@correo.com'), 'el aviso debe decir a que direccion se muda');
+  } finally {
+    global.fetch = fetchOriginal;
+    console.warn = origWarn;
+    delete process.env.RAILWAY_PUBLIC_DOMAIN;
+    if (prevKey !== undefined) process.env.RESEND_API_KEY = prevKey; else delete process.env.RESEND_API_KEY;
+  }
+});
+
+// El logo se enlaza desde el dominio publico; sin dominio no se pone <img> para no
+// dejar un hueco roto en la cabecera.
+test('la cabecera usa el logo solo si hay dominio publico', async () => {
+  const prevKey = process.env.RESEND_API_KEY;
+  process.env.RESEND_API_KEY = 'fake';
+  const fetchOriginal = global.fetch;
+  let ultimo;
+  global.fetch = async (_url, opts) => { ultimo = JSON.parse(opts.body); return { ok: true }; };
+  const origWarn = console.warn;
+  console.warn = () => {};
+
+  try {
+    const { enviarCodigoLogin } = require('../src/services/mailer');
+
+    delete process.env.RAILWAY_PUBLIC_DOMAIN;
+    delete process.env.APP_URL;
+    await enviarCodigoLogin('a@b.com', 'Ana', '111111');
+    assert.ok(!ultimo.html.includes('<img'), 'sin dominio publico no debe haber <img>');
+    assert.ok(ultimo.html.includes('MS Motos') || ultimo.html.includes('Taller MS'));
+
+    process.env.APP_URL = 'https://ejemplo.test/';
+    await enviarCodigoLogin('a@b.com', 'Ana', '111111');
+    assert.ok(ultimo.html.includes('<img'), 'con dominio publico debe llevar el logo');
+    assert.ok(ultimo.html.includes('https://ejemplo.test/assets/logo/'), 'sin barra doble en la URL');
+  } finally {
+    global.fetch = fetchOriginal;
+    console.warn = origWarn;
+    delete process.env.APP_URL;
+    if (prevKey !== undefined) process.env.RESEND_API_KEY = prevKey; else delete process.env.RESEND_API_KEY;
+  }
+});

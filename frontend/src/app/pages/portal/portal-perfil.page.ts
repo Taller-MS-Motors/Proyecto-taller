@@ -36,6 +36,14 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
   notif = { avances: true, recordatorios: true };
   guardandoNotif = false;
 
+  // Cambio de correo en dos pasos: mientras `perfil.email_pendiente` tenga algo,
+  // la cuenta sigue funcionando con el correo viejo y falta confirmar el nuevo.
+  codigoCorreo = '';
+  confirmandoCorreo = false;
+  reenviandoCorreo = false;
+  cooldown = 0;
+  private timer: any = null;
+
   constructor(
     public portal: PortalService,
     public a11y: AccesibilidadService,
@@ -173,25 +181,129 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
     return (n + a).toUpperCase() || 'U';
   }
 
-  guardarCuenta() {
+  // ¿Está tocando el correo? Es el único dato que necesita contraseña y confirmación.
+  private get cambiaCorreo(): boolean {
+    return this.cuenta.email.trim().toLowerCase() !== String(this.perfil?.email || '').toLowerCase();
+  }
+
+  async guardarCuenta() {
     if (!this.cuenta.nombre.trim() || !this.cuenta.apellido.trim()) { this.aviso('Nombre y apellido son requeridos', 'warning'); return; }
     if (!this.cuenta.email.trim()) { this.aviso('El correo es requerido', 'warning'); return; }
+
+    // El correo es con lo que se entra y con lo que se recupera la cuenta: cambiarlo
+    // exige la contraseña, así que una sesión abierta que quede en manos de otro no
+    // alcanza para mudar la cuenta y dejar afuera al dueño.
+    if (this.cambiaCorreo) {
+      const al = await this.alert.create({
+        cssClass: 'portal-alert',
+        header: 'Cambiar tu correo',
+        message: `Te vamos a enviar un código a ${this.cuenta.email.trim()} para confirmar que es tuyo. Hasta entonces seguís entrando con el correo actual.`,
+        inputs: [{ name: 'password', type: 'password', placeholder: 'Tu contraseña', cssClass: 'alert-input' }],
+        buttons: [
+          { text: 'Cancelar', role: 'cancel' },
+          { text: 'Continuar', cssClass: 'portal-alert-confirm', handler: (d) => { this.enviarCuenta(d?.password); } },
+        ],
+      });
+      await al.present();
+      return;
+    }
+    this.enviarCuenta();
+  }
+
+  private enviarCuenta(password?: string) {
+    if (this.cambiaCorreo && !password) { this.aviso('Ingresá tu contraseña', 'warning'); return; }
     this.guardando = true;
     this.portal.updateMiPerfil({
       nombre: this.cuenta.nombre.trim(),
       apellido: this.cuenta.apellido.trim(),
       telefono: this.cuenta.telefono.trim(),
       email: this.cuenta.email.trim(),
+      ...(password ? { password } : {}),
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: r => {
         this.perfil = r.data;
+        // El correo del formulario vuelve al vigente: el nuevo todavía no manda.
+        this.cuenta.email = r.data.email || '';
         // Refleja el nombre en el saludo del inicio.
         this.portal.actualizarClienteLocal({ nombre: r.data.nombre, apellido: r.data.apellido });
         this.guardando = false;
-        this.aviso('Perfil actualizado');
+        if (r.cambio_correo_pendiente) {
+          this.codigoCorreo = '';
+          this.iniciarCooldown();
+        }
+        this.aviso(r.message || 'Perfil actualizado');
       },
       error: (e) => { this.guardando = false; this.aviso(e.error?.error || 'No se pudo actualizar', 'danger'); },
     });
+  }
+
+  // —— Confirmación del correo nuevo ——
+  confirmarCorreo() {
+    const codigo = this.codigoCorreo.trim();
+    if (codigo.length < 6) { this.aviso('Ingresá el código de 6 dígitos', 'warning'); return; }
+    this.confirmandoCorreo = true;
+    this.portal.confirmarCambioCorreo(codigo).pipe(takeUntil(this.destroy$)).subscribe({
+      next: r => {
+        this.perfil = r.data;
+        this.cuenta.email = r.data.email || '';
+        this.codigoCorreo = '';
+        this.confirmandoCorreo = false;
+        this.pararCooldown();
+        this.aviso(r.message || 'Correo actualizado');
+      },
+      error: e => { this.confirmandoCorreo = false; this.aviso(e.error?.error || 'No se pudo confirmar', 'danger'); },
+    });
+  }
+
+  reenviarCorreo() {
+    if (this.cooldown > 0 || this.reenviandoCorreo) return;
+    this.reenviandoCorreo = true;
+    this.portal.reenviarCambioCorreo().pipe(takeUntil(this.destroy$)).subscribe({
+      next: r => { this.reenviandoCorreo = false; this.iniciarCooldown(); this.aviso(r.message || 'Código reenviado'); },
+      error: e => { this.reenviandoCorreo = false; this.aviso(e.error?.error || 'No se pudo reenviar', 'danger'); },
+    });
+  }
+
+  async cancelarCorreo() {
+    const al = await this.alert.create({
+      cssClass: 'portal-alert',
+      header: 'Cancelar el cambio',
+      message: `Se descarta ${this.perfil?.email_pendiente}. Tu cuenta sigue con el correo de siempre.`,
+      buttons: [
+        { text: 'Seguir con el cambio', role: 'cancel' },
+        { text: 'Cancelar el cambio', role: 'destructive', cssClass: 'portal-alert-danger', handler: () => this.confirmarCancelarCorreo() },
+      ],
+    });
+    await al.present();
+  }
+
+  private confirmarCancelarCorreo() {
+    this.portal.cancelarCambioCorreo().pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.perfil = { ...this.perfil, email_pendiente: null };
+        this.cuenta.email = this.perfil.email || '';
+        this.codigoCorreo = '';
+        this.pararCooldown();
+        this.aviso('Cambio de correo cancelado');
+      },
+      error: e => this.aviso(e.error?.error || 'No se pudo cancelar', 'danger'),
+    });
+  }
+
+  // El backend limita a 2 pedidos por minuto: el contador evita que el botón
+  // dispare un 429 en vez de un código.
+  private iniciarCooldown() {
+    this.pararCooldown();
+    this.cooldown = 45;
+    this.timer = setInterval(() => {
+      this.cooldown--;
+      if (this.cooldown <= 0) this.pararCooldown();
+    }, 1000);
+  }
+
+  private pararCooldown() {
+    if (this.timer) { clearInterval(this.timer); this.timer = null; }
+    this.cooldown = 0;
   }
 
   // —— Visor con zoom de la foto de perfil ——
@@ -267,7 +379,7 @@ export class PortalPerfilPage implements OnInit, OnDestroy {
     });
   }
 
-  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
+  ngOnDestroy() { this.pararCooldown(); this.destroy$.next(); this.destroy$.complete(); }
 
   logout() {
     this.portal.logout();

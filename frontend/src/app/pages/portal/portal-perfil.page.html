@@ -49,6 +49,31 @@
         <button class="cta" [disabled]="guardando" (click)="guardarCuenta()">Guardar cambios</button>
       </section>
 
+      <!-- Correo nuevo a la espera de confirmación. Hasta que se confirme, la cuenta
+           sigue funcionando con el correo de siempre. -->
+      <section class="card correo-pendiente" *ngIf="perfil?.email_pendiente">
+        <span class="section-label">Confirmá tu correo nuevo</span>
+        <p class="cp-texto">
+          Te enviamos un código de 6 dígitos a <strong>{{ perfil.email_pendiente }}</strong>.
+          Mientras tanto seguís entrando con <strong>{{ perfil.email }}</strong>.
+        </p>
+        <div class="ig">
+          <label>Código</label>
+          <input type="text" inputmode="numeric" maxlength="6" [(ngModel)]="codigoCorreo"
+                 placeholder="000000" class="cp-codigo" (keyup.enter)="confirmarCorreo()">
+        </div>
+        <button class="cta" [disabled]="confirmandoCorreo" (click)="confirmarCorreo()">
+          {{ confirmandoCorreo ? 'Confirmando…' : 'Confirmar correo' }}
+        </button>
+        <div class="cp-acciones">
+          <button type="button" class="cp-link" [disabled]="cooldown > 0 || reenviandoCorreo" (click)="reenviarCorreo()">
+            {{ cooldown > 0 ? 'Reenviar en ' + cooldown + 's' : 'Reenviar código' }}
+          </button>
+          <button type="button" class="cp-link cp-cancelar" (click)="cancelarCorreo()">Cancelar el cambio</button>
+        </div>
+        <p class="cp-ayuda">¿No te llegó? Revisá el correo no deseado.</p>
+      </section>
+
       <!-- Accesibilidad -->
       <section class="card">
         <span class="section-label">Accesibilidad</span>

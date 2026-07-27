@@ -184,3 +184,19 @@
     margin-top: 10px; box-shadow: none; font-size: 13px;
     ion-icon { font-size: 16px; } }
 }
+
+/* Cambio de correo a la espera de confirmación: borde de acento para que se note
+   que hay algo sin terminar, sin llegar a leerse como un error. */
+.correo-pendiente {
+  border-color: rgba(225, 29, 72, .35);
+  .cp-texto { font-size: 13px; line-height: 1.55; color: var(--n-500); margin: -6px 0 14px;
+    strong { color: var(--ion-text-color); word-break: break-word; } }
+  .cp-codigo { font-family: var(--font-mono, monospace); font-size: 22px; font-weight: 700;
+    letter-spacing: .35em; text-align: center; }
+  .cp-acciones { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; margin-top: 14px; }
+  .cp-link { background: none; border: none; padding: 4px 2px; font: inherit; font-size: 13px;
+    font-weight: 600; color: var(--ion-color-primary); cursor: pointer;
+    &:disabled { color: var(--n-500); cursor: default; }
+    &.cp-cancelar { color: var(--n-500); } }
+  .cp-ayuda { font-size: 12px; color: var(--n-500); text-align: center; margin: 10px 0 0; }
+}

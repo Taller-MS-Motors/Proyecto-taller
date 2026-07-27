@@ -107,6 +107,13 @@ async function ensureSchema() {
         FOREIGN KEY (cliente_id) REFERENCES clientes(id)
       )
     `);
+    // Cambio de correo desde el perfil: la dirección nueva NO reemplaza a la vieja hasta
+    // que se confirma. Así un error de tipeo no deja al cliente encerrado afuera — el
+    // correo anterior sigue siendo el válido para entrar y para recuperar la contraseña.
+    await addColumnIfMissing('clientes', 'email_pendiente', 'VARCHAR(150) NULL');
+    // Los códigos de verificación ahora sirven para dos cosas distintas ('registro' y
+    // 'cambio'); sin distinguirlas, pedir uno invalidaría el otro.
+    await addColumnIfMissing('email_verify_codes', 'proposito', "VARCHAR(20) NOT NULL DEFAULT 'registro'");
 
     // Aprobación digital del presupuesto por parte del cliente.
     await addColumnIfMissing(
