@@ -21,6 +21,12 @@ export class PortalLoginPage implements OnInit, OnDestroy {
   verPass = false;
   bioActivado = false;   // hay credenciales guardadas → mostrar botón de huella
 
+  // Ingreso sin contraseña (OTP por correo). Solo para clientes.
+  modo: 'clave' | 'codigo' = 'clave';
+  codigo = '';
+  codigoEnviado = false;   // ya se pidió el código → mostrar el campo para escribirlo
+  procesandoCodigo = false;
+
   constructor(
     private portal: PortalService,
     private auth: AuthService,
@@ -104,6 +110,50 @@ export class PortalLoginPage implements OnInit, OnDestroy {
           duration: 2500,
           color: 'danger',
         });
+        await t.present();
+      },
+    });
+  }
+
+  // Cambia entre "contraseña" y "código al correo".
+  usarCodigo() { this.modo = 'codigo'; this.codigoEnviado = false; this.codigo = ''; }
+  usarClave() { this.modo = 'clave'; }
+
+  // Paso 1 del OTP: pide el código al correo. Respuesta genérica (no revela si la cuenta existe).
+  async enviarCodigo() {
+    if (!emailValido(this.email)) {
+      const t = await this.toast.create({ message: 'Ingresá un correo válido', duration: 2500, color: 'warning' });
+      return await t.present();
+    }
+    this.procesandoCodigo = true;
+    this.portal.solicitarCodigoLogin(this.email.trim()).pipe(takeUntil(this.destroy$)).subscribe({
+      next: async () => {
+        this.procesandoCodigo = false;
+        this.codigoEnviado = true;
+        const t = await this.toast.create({ message: 'Si tu correo está registrado, te enviamos un código', duration: 3000, color: 'success' });
+        await t.present();
+      },
+      error: async (err) => {
+        this.procesandoCodigo = false;
+        const t = await this.toast.create({ message: err.error?.error || 'No se pudo enviar el código', duration: 2500, color: 'danger' });
+        await t.present();
+      },
+    });
+  }
+
+  // Paso 2 del OTP: valida el código y entra al portal.
+  async ingresarConCodigo() {
+    if (!this.codigo || this.codigo.trim().length < 4) return;
+    const l = await this.loading.create({ message: 'Ingresando...', cssClass: 'portal-loading', spinner: 'crescent' });
+    await l.present();
+    this.portal.verificarCodigoLogin(this.email.trim(), this.codigo.trim()).pipe(takeUntil(this.destroy$)).subscribe({
+      next: async () => {
+        await l.dismiss();
+        this.router.navigate(['/portal'], { replaceUrl: true });
+      },
+      error: async (err) => {
+        await l.dismiss();
+        const t = await this.toast.create({ message: err.error?.error || 'Código inválido o expirado', duration: 2500, color: 'danger' });
         await t.present();
       },
     });

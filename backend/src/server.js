@@ -111,7 +111,7 @@ app.use(express.json({ limit: '10mb' }));
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 
 // Rate limiting: estricto en autenticación (fuerza bruta + bcrypt), general en el resto.
-app.use(['/api/auth/login', '/api/portal/login', '/api/portal/registro', '/api/portal/recuperar'], authLimiter);
+app.use(['/api/auth/login', '/api/portal/login', '/api/portal/registro', '/api/portal/recuperar', '/api/portal/otp'], authLimiter);
 app.use('/api', apiLimiter);
 app.use('/api/admin', adminLimiter);
 

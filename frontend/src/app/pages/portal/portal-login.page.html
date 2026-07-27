@@ -14,29 +14,60 @@
           <ion-label position="stacked">Correo</ion-label>
           <ion-input type="email" [(ngModel)]="email" autocomplete="email" placeholder="tu@correo.com"></ion-input>
         </ion-item>
-        <ion-item lines="none">
-          <ion-label position="stacked">Contraseña</ion-label>
-          <ion-input [type]="verPass ? 'text' : 'password'" [(ngModel)]="password" placeholder="••••••••" (keyup.enter)="ingresar()">
-            <ion-button fill="clear" slot="end" (click)="verPass = !verPass" aria-label="Mostrar contraseña">
-              <ion-icon slot="icon-only" [name]="verPass ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+
+        <!-- MODO CONTRASEÑA -->
+        <ng-container *ngIf="modo === 'clave'">
+          <ion-item lines="none">
+            <ion-label position="stacked">Contraseña</ion-label>
+            <ion-input [type]="verPass ? 'text' : 'password'" [(ngModel)]="password" placeholder="••••••••" (keyup.enter)="ingresar()">
+              <ion-button fill="clear" slot="end" (click)="verPass = !verPass" aria-label="Mostrar contraseña">
+                <ion-icon slot="icon-only" [name]="verPass ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+              </ion-button>
+            </ion-input>
+          </ion-item>
+
+          <ion-button expand="block" (click)="ingresar()" [disabled]="!email || !password">
+            Ingresar
+            <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
+          </ion-button>
+
+          <!-- Ingreso con biometría (solo si está activado en este dispositivo nativo) -->
+          <ion-button *ngIf="bioActivado" expand="block" fill="outline" (click)="ingresarConBiometria()">
+            <ion-icon name="finger-print-outline" slot="start"></ion-icon>
+            Ingresar con huella / Face ID
+          </ion-button>
+
+          <a class="portal-link sub codigo-toggle" (click)="usarCodigo()">Entrar con un código a mi correo</a>
+        </ng-container>
+
+        <!-- MODO CÓDIGO (OTP sin contraseña, solo clientes) -->
+        <ng-container *ngIf="modo === 'codigo'">
+          <ion-item *ngIf="codigoEnviado" lines="none">
+            <ion-label position="stacked">Código de 6 dígitos</ion-label>
+            <ion-input type="tel" inputmode="numeric" maxlength="6" [(ngModel)]="codigo" placeholder="••••••" (keyup.enter)="ingresarConCodigo()"></ion-input>
+          </ion-item>
+
+          <ion-button *ngIf="!codigoEnviado" expand="block" (click)="enviarCodigo()" [disabled]="!email || procesandoCodigo">
+            Enviarme un código
+            <ion-icon name="mail-outline" slot="end"></ion-icon>
+          </ion-button>
+
+          <ng-container *ngIf="codigoEnviado">
+            <ion-button expand="block" (click)="ingresarConCodigo()" [disabled]="!codigo">
+              Ingresar
+              <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
             </ion-button>
-          </ion-input>
-        </ion-item>
+            <ion-button expand="block" fill="clear" (click)="enviarCodigo()" [disabled]="procesandoCodigo">
+              Reenviar código
+            </ion-button>
+          </ng-container>
 
-        <ion-button expand="block" (click)="ingresar()" [disabled]="!email || !password">
-          Ingresar
-          <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
-        </ion-button>
-
-        <!-- Ingreso con biometría (solo si está activado en este dispositivo nativo) -->
-        <ion-button *ngIf="bioActivado" expand="block" fill="outline" (click)="ingresarConBiometria()">
-          <ion-icon name="finger-print-outline" slot="start"></ion-icon>
-          Ingresar con huella / Face ID
-        </ion-button>
+          <a class="portal-link sub codigo-toggle" (click)="usarClave()">Volver a ingresar con contraseña</a>
+        </ng-container>
       </ion-card-content>
     </ion-card>
 
     <a class="portal-link strong" routerLink="/portal/registro">Crear una cuenta</a>
-    <a class="portal-link sub" routerLink="/portal/recuperar">¿Olvidaste tu contraseña?</a>
+    <a *ngIf="modo === 'clave'" class="portal-link sub" routerLink="/portal/recuperar">¿Olvidaste tu contraseña?</a>
   </div>
 </ion-content>

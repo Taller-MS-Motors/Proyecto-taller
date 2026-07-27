@@ -68,6 +68,18 @@ export class PortalService {
     );
   }
 
+  // Ingreso sin contraseña (OTP). Paso 1: pide el código al correo (respuesta genérica).
+  solicitarCodigoLogin(email: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.url}/otp/solicitar`, { email });
+  }
+
+  // Paso 2: valida el código y entra (auto-login, guarda la sesión).
+  verificarCodigoLogin(email: string, codigo: string): Observable<{ data: { token: string; cliente: ClientePortal } }> {
+    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/otp/verificar`, { email, codigo }).pipe(
+      tap(res => this.guardarSesion(res.data.token, res.data.cliente))
+    );
+  }
+
   // Guarda la sesión del cliente (la usa el login unificado cuando tipo === 'cliente').
   aplicarSesion(token: string, cliente: ClientePortal) {
     this.guardarSesion(token, cliente);

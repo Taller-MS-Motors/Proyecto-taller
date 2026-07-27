@@ -93,6 +93,20 @@ function plantillaCodigo(nombre, codigo) {
   return envoltorio('Taller MS', 'Recuperá tu contraseña', cuerpo);
 }
 
+function plantillaCodigoLogin(nombre, codigo) {
+  const cuerpo = `
+    ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, usá este código para ingresar a tu cuenta. Vence en 10 minutos.`)}
+    <div style="text-align:center;padding:12px 0 8px;">
+      <div style="display:inline-block;background:#0a0a0a;border:1px solid #be123c;border-radius:16px;padding:18px 28px;">
+        <span style="color:#fafafa;font-size:38px;font-weight:700;letter-spacing:10px;font-family:'JetBrains Mono','Courier New',monospace;">${escapar(codigo)}</span>
+      </div>
+    </div>
+    <p style="color:#737373;font-size:12px;line-height:1.5;margin:12px 0 0;">
+      Si no intentaste ingresar, ignorá este correo. Nadie puede entrar a tu cuenta sin este código.
+    </p>`;
+  return envoltorio('Taller MS', 'Tu código de ingreso', cuerpo);
+}
+
 function plantillaRecordatorio({ nombre, hora, servicio, moto, sucursal, taller }) {
   const donde = sucursal ? ` en ${escapar(sucursal)}` : '';
   const cuerpo = `
@@ -129,6 +143,16 @@ async function enviarCodigoReset(email, nombre, codigo) {
   });
 }
 
+// Código de ingreso sin contraseña (OTP) para el portal del cliente.
+async function enviarCodigoLogin(email, nombre, codigo) {
+  return enviarCorreo({
+    to: email,
+    subject: 'Tu código de ingreso',
+    html: plantillaCodigoLogin(nombre, codigo),
+    devLog: `Código de ingreso para ${email}: ${codigo}`,
+  });
+}
+
 // Recordatorio de la cita del día siguiente.
 async function enviarRecordatorioCita(email, datos) {
   return enviarCorreo({
@@ -149,4 +173,4 @@ async function enviarAvisoEstado(email, datos) {
   });
 }
 
-module.exports = { enviarCorreo, enviarCodigoReset, enviarRecordatorioCita, enviarAvisoEstado };
+module.exports = { enviarCorreo, enviarCodigoReset, enviarCodigoLogin, enviarRecordatorioCita, enviarAvisoEstado };

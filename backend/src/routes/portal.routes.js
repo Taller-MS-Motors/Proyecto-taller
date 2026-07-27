@@ -6,7 +6,7 @@ const { fail } = require('../utils/responder');
 const authCliente = require('../middleware/auth-cliente');
 const { emailValido, fotoValida } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
-const { enviarCodigoReset } = require('../services/mailer');
+const { enviarCodigoReset, enviarCodigoLogin } = require('../services/mailer');
 const { SERVICIOS } = require('../utils/servicios');
 const { getConfig, horasDisponibles } = require('../utils/configuracion');
 const { getSucursales, sucursalValida, sucursalPorDefecto } = require('../utils/sucursales');
@@ -186,6 +186,81 @@ router.post('/recuperar/confirmar', async (req, res) => {
 
     const { payload, token } = tokenCliente(cliente);
     res.json({ data: { token, cliente: payload } });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// ── Ingreso sin contraseña (OTP por correo) ──────────────────────────────
+// A diferencia del reset, NO exige password_hash: sirve para que cualquier cliente
+// que el taller ya tenga registrado entre con un código enviado a su correo, sin
+// haberse creado nunca una contraseña. Mismas garantías: hash, expiración 10 min,
+// máx 5 intentos, un solo uso, respuesta genérica (anti-enumeración) y rate limit.
+const MSG_OTP_GENERICO = 'Si tu correo está registrado, te enviamos un código de ingreso.';
+router.post('/otp/solicitar', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+
+    const clave = String(email).trim().toLowerCase();
+    const limite = consumir(`otp:${clave}`, { porMinuto: 1, porHora: 5 });
+    if (!limite.ok) {
+      return res.status(429).json({ error: `Esperá ${limite.retryAfter}s antes de pedir otro código.` });
+    }
+
+    const [[cliente]] = await pool.query(
+      'SELECT id, nombre FROM clientes WHERE email = ? AND activo = 1',
+      [email]
+    );
+    if (cliente) {
+      const codigo = String(Math.floor(100000 + Math.random() * 900000)); // 6 dígitos
+      const codeHash = await bcrypt.hash(codigo, 10);
+      // Invalida códigos previos y guarda el nuevo (vence en 10 min).
+      await pool.query('UPDATE login_codes SET used = 1 WHERE cliente_id = ? AND used = 0', [cliente.id]);
+      await pool.query(
+        'INSERT INTO login_codes (cliente_id, code_hash, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
+        [cliente.id, codeHash]
+      );
+      await enviarCodigoLogin(email, cliente.nombre, codigo);
+    }
+
+    res.json({ message: MSG_OTP_GENERICO });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/portal/otp/verificar — valida el código y entra (auto-login). Público.
+router.post('/otp/verificar', async (req, res) => {
+  try {
+    const { email, codigo } = req.body;
+    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+    if (!codigo) return res.status(400).json({ error: 'El código es requerido' });
+
+    const [[cliente]] = await pool.query(
+      'SELECT id, nombre, apellido, foto FROM clientes WHERE email = ? AND activo = 1',
+      [email]
+    );
+    const ERR_CODIGO = 'Código inválido o expirado';
+    if (!cliente) return res.status(400).json({ error: ERR_CODIGO });
+
+    const [[reg]] = await pool.query(
+      `SELECT id, code_hash, attempts FROM login_codes
+       WHERE cliente_id = ? AND used = 0 AND expires_at > NOW()
+       ORDER BY created_at DESC LIMIT 1`,
+      [cliente.id]
+    );
+    if (!reg || reg.attempts >= 5) return res.status(400).json({ error: ERR_CODIGO });
+
+    const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
+    if (!ok) {
+      await pool.query('UPDATE login_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      return res.status(400).json({ error: ERR_CODIGO });
+    }
+
+    await pool.query('UPDATE login_codes SET used = 1 WHERE id = ?', [reg.id]);
+    const { payload, token } = tokenCliente(cliente);
+    res.json({ data: { token, cliente: { ...payload, foto: cliente.foto || null } } });
   } catch (err) {
     fail(res, err);
   }
