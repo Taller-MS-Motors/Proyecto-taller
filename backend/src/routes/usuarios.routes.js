@@ -112,4 +112,63 @@ router.patch('/:id/sucursal', async (req, res) => {
   }
 });
 
+// DELETE /:id — elimina un empleado DEFINITIVAMENTE, tenga historial o no.
+//
+// `usuarios` está referenciado por 10 claves foráneas, así que un DELETE pelado
+// fallaría. Se limpia en una transacción, distinguiendo dos casos:
+//
+//   • Rastro PERSONAL del empleado (columnas NOT NULL, no se pueden desvincular):
+//     sus avances escritos, sus tareas y sus mensajes internos → se BORRAN.
+//   • Trabajo del TALLER (columnas que aceptan NULL): citas, órdenes, garantías,
+//     tareas que él asignó y cortesías aplicadas → se DESVINCULAN (quedan sin
+//     responsable). No se borran: son el historial del negocio y la facturación
+//     del cliente; eliminarlos destruiría datos contables ajenos al empleado.
+router.delete('/:id', async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const id = Number(req.params.id);
+    // Anti-lockout: nadie se borra a sí mismo (quedaría sin acceso al sistema).
+    if (id === req.usuario.id) {
+      conn.release();
+      return res.status(400).json({ error: 'No podés eliminar tu propia cuenta' });
+    }
+    const [[usuario]] = await conn.query('SELECT id FROM usuarios WHERE id = ?', [id]);
+    if (!usuario) {
+      conn.release();
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    await conn.beginTransaction();
+
+    // 1) Rastro personal (NOT NULL → hay que borrar la fila).
+    await conn.query('DELETE FROM orden_avances WHERE usuario_id = ?', [id]);
+    await conn.query('DELETE FROM tareas_mecanico WHERE tecnico_id = ?', [id]);
+    await conn.query('DELETE FROM mensaje_lecturas WHERE usuario_id = ?', [id]);
+    await conn.query('DELETE FROM mensajes_internos WHERE remitente_id = ? OR destino_id = ?', [id, id]);
+
+    // 2) Trabajo del taller: se conserva, sin responsable.
+    await conn.query('UPDATE citas SET usuario_id = NULL WHERE usuario_id = ?', [id]);
+    await conn.query('UPDATE citas SET tecnico_id = NULL WHERE tecnico_id = ?', [id]);
+    await conn.query('UPDATE ordenes_trabajo SET recepcionista_id = NULL WHERE recepcionista_id = ?', [id]);
+    await conn.query('UPDATE ordenes_trabajo SET tecnico_id = NULL WHERE tecnico_id = ?', [id]);
+    await conn.query('UPDATE garantias SET creado_por = NULL WHERE creado_por = ?', [id]);
+    await conn.query('UPDATE tareas_mecanico SET asignado_por = NULL WHERE asignado_por = ?', [id]);
+    await conn.query('UPDATE recompensas_canjeadas SET aplicado_por = NULL WHERE aplicado_por = ?', [id]);
+
+    await conn.query('DELETE FROM usuarios WHERE id = ?', [id]);
+    await conn.commit();
+    res.json({ message: 'Empleado eliminado' });
+  } catch (err) {
+    await conn.rollback().catch(() => {});
+    // Si quedó alguna referencia sin contemplar, el mensaje explica qué pasó
+    // (y nada se borró a medias: la transacción se revirtió entera).
+    if (err.code === 'ER_ROW_IS_REFERENCED_2' || err.code === 'ER_ROW_IS_REFERENCED') {
+      return res.status(409).json({ error: 'No se pudo eliminar: al empleado le quedan registros asociados. Avisá para revisarlo.' });
+    }
+    fail(res, err);
+  } finally {
+    conn.release();
+  }
+});
+
 module.exports = router;

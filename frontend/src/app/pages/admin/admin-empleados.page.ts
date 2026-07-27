@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { ToastController } from '@ionic/angular';
+import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { UsuariosService } from '../../services/usuarios.service';
@@ -24,7 +24,14 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
     tecnico: 'Mecánico', recepcion: 'Recepcionista', admin: 'Administración',
   };
 
-  constructor(private svc: UsuariosService, private admin: AdminService, private toast: ToastController) {}
+  eliminando: number | null = null;
+
+  constructor(
+    private svc: UsuariosService,
+    private admin: AdminService,
+    private toast: ToastController,
+    private alert: AlertController,
+  ) {}
 
   ngOnInit() { this.cargar(); this.cargarSucursales(); }
   ionViewWillEnter() { this.cargar(); }
@@ -83,6 +90,41 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
         this.aviso('Empleado creado');
       },
       error: (err) => { this.creando = false; this.aviso(err.error?.error || 'No se pudo crear', 'danger'); },
+    });
+  }
+
+  // Borrado definitivo (pide confirmación). Se van sus tareas, avances y mensajes;
+  // las citas y órdenes del taller quedan, pero sin él como responsable.
+  async eliminar(u: Usuario) {
+    const al = await this.alert.create({
+      header: 'Eliminar empleado',
+      message: `¿Eliminar a ${u.nombre} definitivamente? Se borrarán sus tareas, avances y mensajes. Sus citas y órdenes se conservan, pero quedarán sin responsable asignado. Esta acción no se puede deshacer.`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        { text: 'Eliminar', role: 'destructive', handler: () => this.confirmarEliminar(u) },
+      ],
+    });
+    await al.present();
+  }
+
+  private confirmarEliminar(u: Usuario) {
+    this.eliminando = u.id!;
+    this.svc.eliminar(u.id!).pipe(takeUntil(this.destroy$)).subscribe({
+      next: async () => {
+        this.eliminando = null;
+        this.usuarios = this.usuarios.filter(x => x.id !== u.id);
+        const t = await this.toast.create({ message: 'Empleado eliminado', duration: 2000, color: 'success' });
+        await t.present();
+      },
+      error: async (err) => {
+        this.eliminando = null;
+        const t = await this.toast.create({
+          message: err.error?.error || 'No se pudo eliminar',
+          duration: 5000,
+          color: 'warning',
+        });
+        await t.present();
+      },
     });
   }
 
