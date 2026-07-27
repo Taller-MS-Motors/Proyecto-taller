@@ -1,10 +1,11 @@
-import { Component, OnDestroy } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
 import { emailValido } from '../../utils/validar';
+import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/turnstile.util';
 
 @Component({
   standalone: false,
@@ -12,7 +13,7 @@ import { emailValido } from '../../utils/validar';
   templateUrl: './portal-registro.page.html',
   styleUrls: ['./portal-login.page.scss'],
 })
-export class PortalRegistroPage implements OnDestroy {
+export class PortalRegistroPage implements AfterViewInit, OnDestroy {
   private destroy$ = new Subject<void>();
   nombre = '';
   apellido = '';
@@ -24,12 +25,22 @@ export class PortalRegistroPage implements OnDestroy {
   verPass = false;
   verConfirmar = false;
 
+  // Anti-bot: honeypot (debe quedar vacío) + captcha Turnstile.
+  website = '';
+  mostrarCaptcha = turnstileHabilitado();
+  @ViewChild('tsBox') tsBox?: ElementRef<HTMLElement>;
+  private ts?: TurnstileWidget;
+
   constructor(
     private portal: PortalService,
     private router: Router,
     private loading: LoadingController,
     private toast: ToastController
   ) {}
+
+  async ngAfterViewInit() {
+    if (this.tsBox) this.ts = await montarTurnstile(this.tsBox.nativeElement);
+  }
 
   get valido(): boolean {
     return !!(this.nombre.trim() && this.apellido.trim() && this.telefono.trim() && this.cedula.trim() &&
@@ -49,6 +60,7 @@ export class PortalRegistroPage implements OnDestroy {
     this.portal.registro({
       nombre: this.nombre.trim(), apellido: this.apellido.trim(), telefono: this.telefono.trim(),
       email: this.email.trim(), cedula: this.cedula.trim(), password: this.password,
+      website: this.website, turnstileToken: this.ts?.token() || '',
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: async () => {
         await l.dismiss();
@@ -57,12 +69,13 @@ export class PortalRegistroPage implements OnDestroy {
       },
       error: async (err) => {
         await l.dismiss();
+        this.ts?.reset();   // token de un solo uso: pedir uno nuevo para el próximo intento
         this.mostrar(err.error?.error || 'No se pudo crear la cuenta', 'danger');
       },
     });
   }
 
-  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
+  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); this.ts?.destroy(); }
 
   irLogin() {
     this.router.navigate(['/portal/login']);

@@ -7,6 +7,7 @@ const authCliente = require('../middleware/auth-cliente');
 const { emailValido, fotoValida } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
 const { enviarCodigoReset, enviarCodigoLogin } = require('../services/mailer');
+const { antibot } = require('../utils/antibot');
 const { SERVICIOS } = require('../utils/servicios');
 const { getConfig, horasDisponibles } = require('../utils/configuracion');
 const { getSucursales, sucursalValida, sucursalPorDefecto } = require('../utils/sucursales');
@@ -69,7 +70,7 @@ router.post('/login', async (req, res) => {
 });
 
 // POST /api/portal/registro — auto-registro del cliente (público)
-router.post('/registro', async (req, res) => {
+router.post('/registro', antibot(), async (req, res) => {
   try {
     const { nombre, apellido, telefono, email, cedula, password } = req.body;
     if (!nombre || !apellido || !telefono || !email || !cedula || !password) {
@@ -117,7 +118,7 @@ router.post('/registro', async (req, res) => {
 // POST /api/portal/recuperar/solicitar — envía un código de 6 dígitos al correo (público)
 // Respuesta genérica siempre (anti-enumeración de cuentas).
 const MSG_GENERICO = 'Si la cuenta existe, te enviamos un código a tu correo.';
-router.post('/recuperar/solicitar', async (req, res) => {
+router.post('/recuperar/solicitar', antibot(), async (req, res) => {
   try {
     const { email } = req.body;
     if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
@@ -197,7 +198,7 @@ router.post('/recuperar/confirmar', async (req, res) => {
 // haberse creado nunca una contraseña. Mismas garantías: hash, expiración 10 min,
 // máx 5 intentos, un solo uso, respuesta genérica (anti-enumeración) y rate limit.
 const MSG_OTP_GENERICO = 'Si tu correo está registrado, te enviamos un código de ingreso.';
-router.post('/otp/solicitar', async (req, res) => {
+router.post('/otp/solicitar', antibot(), async (req, res) => {
   try {
     const { email } = req.body;
     if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });

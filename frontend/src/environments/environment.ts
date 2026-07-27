@@ -5,7 +5,9 @@
 export const environment = {
   production: false,
   apiUrl: 'http://localhost:3000/api',
-  nativeApiUrl: 'http://localhost:3000'
+  nativeApiUrl: 'http://localhost:3000',
+  // Site key de Cloudflare Turnstile (captcha anti-bot). Vacío = desactivado.
+  turnstileSiteKey: ''
 };
 
 /*

@@ -72,6 +72,11 @@
             <ion-input type="tel" inputmode="numeric" maxlength="6" [(ngModel)]="codigo" placeholder="••••••" (keyup.enter)="ingresarConCodigo()"></ion-input>
           </ion-item>
 
+          <!-- Anti-bot al pedir el código: honeypot + captcha invisible. -->
+          <input *ngIf="!codigoEnviado" type="text" [(ngModel)]="website" name="website" tabindex="-1"
+                 autocomplete="off" aria-hidden="true" class="hp-field">
+          <div #tsBox *ngIf="!codigoEnviado && mostrarCaptcha" class="turnstile-box"></div>
+
           <ion-button *ngIf="!codigoEnviado" expand="block" (click)="enviarCodigo()" [disabled]="!email || procesandoCodigo">
             Enviarme un código
             <ion-icon name="mail-outline" slot="end"></ion-icon>

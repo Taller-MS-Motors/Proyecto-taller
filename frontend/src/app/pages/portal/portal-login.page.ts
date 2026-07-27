@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, ElementRef, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
@@ -7,6 +7,7 @@ import { PortalService } from '../../services/portal.service';
 import { AuthService } from '../../services/auth.service';
 import { BiometriaService } from '../../services/biometria.service';
 import { emailValido } from '../../utils/validar';
+import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../shared/turnstile.util';
 
 @Component({
   standalone: false,
@@ -33,6 +34,16 @@ export class PortalLoginPage implements OnInit, OnDestroy {
   tokenParcial = '';
   codigo2fa = '';
   verificando2fa = false;
+
+  // Anti-bot para el pedido de código OTP: honeypot + captcha Turnstile.
+  website = '';
+  mostrarCaptcha = turnstileHabilitado();
+  private ts?: TurnstileWidget;
+  // El contenedor aparece recién al entrar al modo "código", así que lo montamos
+  // vía setter cuando el elemento existe en el DOM (no en ngAfterViewInit).
+  @ViewChild('tsBox') set tsBox(el: ElementRef<HTMLElement> | undefined) {
+    if (el && !this.ts) montarTurnstile(el.nativeElement).then(w => (this.ts = w));
+  }
 
   constructor(
     private portal: PortalService,
@@ -173,7 +184,8 @@ export class PortalLoginPage implements OnInit, OnDestroy {
       return await t.present();
     }
     this.procesandoCodigo = true;
-    this.portal.solicitarCodigoLogin(this.email.trim()).pipe(takeUntil(this.destroy$)).subscribe({
+    this.portal.solicitarCodigoLogin(this.email.trim(), { website: this.website, turnstileToken: this.ts?.token() || '' })
+      .pipe(takeUntil(this.destroy$)).subscribe({
       next: async () => {
         this.procesandoCodigo = false;
         this.codigoEnviado = true;
@@ -182,6 +194,7 @@ export class PortalLoginPage implements OnInit, OnDestroy {
       },
       error: async (err) => {
         this.procesandoCodigo = false;
+        this.ts?.reset();
         const t = await this.toast.create({ message: err.error?.error || 'No se pudo enviar el código', duration: 2500, color: 'danger' });
         await t.present();
       },
@@ -206,5 +219,5 @@ export class PortalLoginPage implements OnInit, OnDestroy {
     });
   }
 
-  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
+  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); this.ts?.destroy(); }
 }

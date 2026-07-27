@@ -1,3 +1,22 @@
+// Honeypot anti-bot: fuera de pantalla y sin interacción (invisible para humanos).
+.hp-field {
+  position: absolute !important;
+  left: -9999px;
+  top: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+// Contenedor del captcha Turnstile.
+.turnstile-box {
+  margin: 14px 0 4px;
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+}
+
 // Logo: llave + martillo cruzados en carmesí
 .logo-cross {
   position: relative;
