@@ -56,7 +56,7 @@
       background: radial-gradient(circle, rgba(255, 255, 255, .35), transparent 70%);
       opacity: 0;
       transform: scale(.7);
-      animation: boot-glow .9s ease-out forwards;
+      animation: boot-glow 1.6s ease-out forwards;
     }
     .boot-mark {
       position: relative;
@@ -64,16 +64,16 @@
       height: 84px;
       opacity: 0;
       transform: scale(.94);
-      animation: boot-mark .9s cubic-bezier(.2, .7, .3, 1) forwards;
+      animation: boot-mark 1.6s cubic-bezier(.2, .7, .3, 1) forwards;
     }
     @keyframes boot-glow {
-      0%, 10% { opacity: 0; transform: scale(.7); }
-      38% { opacity: .7; transform: scale(1.15); }
-      70%, 100% { opacity: .25; transform: scale(1); }
+      0%, 8% { opacity: 0; transform: scale(.7); }
+      30% { opacity: .7; transform: scale(1.15); }
+      55%, 100% { opacity: .25; transform: scale(1); }
     }
     @keyframes boot-mark {
-      0%, 8% { opacity: 0; transform: scale(.94); }
-      30%, 100% { opacity: 1; transform: scale(1); }
+      0%, 6% { opacity: 0; transform: scale(.94); }
+      22%, 100% { opacity: 1; transform: scale(1); }
     }
     @media (prefers-reduced-motion: reduce) {
       .boot-glow, .boot-mark { animation-duration: .01ms !important; }
@@ -90,16 +90,25 @@
     (function () {
       var el = document.getElementById('boot-splash');
       if (!el) return;
+      var inicio = Date.now();
+      // En el teléfono, con los assets locales, Angular puede arrancar y navegar
+      // casi al instante — sin este mínimo, la animación se corta a mitad y se
+      // siente como un parpadeo. Se sostiene lo que falte para completar el respiro.
+      var MOSTRAR_MIN_MS = 1600;
       var hidden = false;
-      function hide() {
+      function ocultarYa() {
         if (hidden) return;
         hidden = true;
         el.classList.add('hide');
         setTimeout(function () { el.remove(); }, 400);
       }
+      function hide() {
+        var faltan = MOSTRAR_MIN_MS - (Date.now() - inicio);
+        if (faltan > 0) { setTimeout(ocultarYa, faltan); } else { ocultarYa(); }
+      }
       window.__hideBootSplash = hide;
       // Salvavidas: si algo falla al iniciar Angular, no dejar la pantalla trabada.
-      setTimeout(hide, 4000);
+      setTimeout(ocultarYa, 4000);
     })();
   </script>
   <app-root></app-root>
