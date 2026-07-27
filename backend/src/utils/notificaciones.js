@@ -116,4 +116,35 @@ async function notificarMecanico(tecnicoId, mensaje, remitenteId) {
   }
 }
 
-module.exports = { notificarCambioEstado, crearNotificacion, notificarMecanico, ESTADO_LEGIBLE };
+// Avisa al cliente que su presupuesto/cotización está listo para aprobar. Se dispara
+// cuando la orden entra en 'esperando_aprobacion', por CUALQUIER vía (recepción con el
+// botón "Enviar cotización", o un cambio de estado desde el detalle de la orden).
+// Va contra el cliente de la ORDEN (no depende de que haya una cita ligada) y respeta
+// la preferencia del taller notif_cotizacion.
+async function notificarPresupuestoListo(ordenId) {
+  try {
+    const config = await getConfig();
+    if (!config.notif_cotizacion) return;
+    const [[orden]] = await pool.query(
+      `SELECT ot.cliente_id, ot.numero_orden, m.marca, m.modelo,
+              (SELECT id FROM citas WHERE orden_id = ot.id LIMIT 1) AS cita_id
+       FROM ordenes_trabajo ot
+       LEFT JOIN motos m ON m.id = ot.moto_id
+       WHERE ot.id = ?`,
+      [ordenId]
+    );
+    if (!orden || !orden.cliente_id) return;
+    const moto = [orden.marca, orden.modelo].filter(Boolean).join(' ') || 'tu moto';
+    await crearNotificacion({
+      cliente_id: orden.cliente_id,
+      cita_id: orden.cita_id || null,
+      titulo: `Presupuesto listo: ${moto}`,
+      mensaje: `Tu presupuesto (orden ${orden.numero_orden}) está listo. Revisalo y aprobalo desde el portal.`,
+      tipo: 'presupuesto',
+    });
+  } catch (err) {
+    console.error('⚠️  No se pudo notificar el presupuesto:', err.message);
+  }
+}
+
+module.exports = { notificarCambioEstado, crearNotificacion, notificarMecanico, notificarPresupuestoListo, ESTADO_LEGIBLE };

@@ -4,6 +4,7 @@ const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { generarNumeroOrden, sincronizarCitaDesdeOrden, cerrarOrden } = require('../utils/ordenes');
+const { notificarPresupuestoListo } = require('../utils/notificaciones');
 const { TRANSICIONES_ORDEN, transicionPermitida } = require('../utils/transiciones');
 const { sucursalValida } = require('../utils/sucursales');
 const { LEIDO_POR_MI, VISTO_POR_OTRO, marcarLeidos } = require('../utils/mensajes');
@@ -204,6 +205,10 @@ router.patch('/:id/estado', async (req, res) => {
 
     // Refleja el avance en la cita vinculada (si la hay) → portal del cliente + mecánico.
     await sincronizarCitaDesdeOrden(req.params.id, estado);
+
+    // Cotización lista: avisar al cliente cuando la orden entra a esperando aprobación,
+    // por cualquier vía (no solo desde el flujo de "Enviar cotización" de recepción).
+    if (estado === 'esperando_aprobacion') await notificarPresupuestoListo(req.params.id);
 
     res.json({ data: { estado }, message: 'Estado actualizado' });
   } catch (err) {
