@@ -93,12 +93,12 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
     });
   }
 
-  // Borrado definitivo (pide confirmación). Si el empleado ya trabajó, el backend
-  // lo rechaza con 409 y ofrecemos desactivarlo, que conserva su historial.
+  // Borrado definitivo (pide confirmación). Se van sus tareas, avances y mensajes;
+  // las citas y órdenes del taller quedan, pero sin él como responsable.
   async eliminar(u: Usuario) {
     const al = await this.alert.create({
       header: 'Eliminar empleado',
-      message: `¿Eliminar a ${u.nombre} definitivamente? Esta acción no se puede deshacer.`,
+      message: `¿Eliminar a ${u.nombre} definitivamente? Se borrarán sus tareas, avances y mensajes. Sus citas y órdenes se conservan, pero quedarán sin responsable asignado. Esta acción no se puede deshacer.`,
       buttons: [
         { text: 'Cancelar', role: 'cancel' },
         { text: 'Eliminar', role: 'destructive', handler: () => this.confirmarEliminar(u) },
