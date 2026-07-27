@@ -10,6 +10,17 @@ const TOKEN_KEY = 'tallerms_token';
 const USUARIO_KEY = 'tallerms_usuario';
 const nativo = Capacitor.isNativePlatform();
 
+// Respuesta del login unificado: o abre sesión (token + usuario/cliente), o pide
+// el segundo factor (requiere_2fa + token_parcial), que solo aplica al personal.
+export interface LoginUnificadoResp {
+  tipo: 'staff' | 'cliente';
+  token?: string;
+  usuario?: Usuario;
+  cliente?: any;
+  requiere_2fa?: boolean;
+  token_parcial?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private apiUrl = environment.apiUrl;
@@ -42,10 +53,40 @@ export class AuthService {
   }
 
   // Login unificado (personal o cliente). No persiste: el llamador decide según `tipo`.
-  loginUnificado(email: string, password: string): Observable<{ data: { token: string; tipo: 'staff' | 'cliente'; usuario?: Usuario; cliente?: any } }> {
-    return this.http.post<{ data: { token: string; tipo: 'staff' | 'cliente'; usuario?: Usuario; cliente?: any } }>(
-      `${this.apiUrl}/auth/login`, { email, password }
+  // Si el usuario tiene verificación en dos pasos, la respuesta NO trae sesión:
+  // llega `requiere_2fa` + `token_parcial` para canjear en verificar2FA().
+  loginUnificado(email: string, password: string): Observable<{ data: LoginUnificadoResp }> {
+    return this.http.post<{ data: LoginUnificadoResp }>(`${this.apiUrl}/auth/login`, { email, password });
+  }
+
+  // ── Verificación en dos pasos (personal) ──
+  // Canjea el token parcial + el código por una sesión real.
+  verificar2FA(tokenParcial: string, codigo: string): Observable<{ data: { token: string; usuario: Usuario } }> {
+    return this.http.post<{ data: { token: string; usuario: Usuario } }>(
+      `${this.apiUrl}/auth/2fa/verificar`, { token_parcial: tokenParcial, codigo }
     );
+  }
+
+  estado2FA(): Observable<{ data: { activado: boolean; backup_restantes: number } }> {
+    return this.http.get<{ data: { activado: boolean; backup_restantes: number } }>(`${this.apiUrl}/auth/2fa/estado`);
+  }
+
+  // Paso 1 del alta: genera la clave para configurar la app de autenticación.
+  setup2FA(): Observable<{ data: { secreto: string; secreto_legible: string; uri: string } }> {
+    return this.http.post<{ data: { secreto: string; secreto_legible: string; uri: string } }>(
+      `${this.apiUrl}/auth/2fa/setup`, {}
+    );
+  }
+
+  // Paso 2: confirma con un código y activa. Devuelve los códigos de respaldo (una sola vez).
+  activar2FA(codigo: string): Observable<{ data: { codigos_respaldo: string[] }; message: string }> {
+    return this.http.post<{ data: { codigos_respaldo: string[] }; message: string }>(
+      `${this.apiUrl}/auth/2fa/activar`, { codigo }
+    );
+  }
+
+  desactivar2FA(password: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.apiUrl}/auth/2fa/desactivar`, { password });
   }
 
   // Guarda la sesión del personal (la usa el login unificado cuando tipo === 'staff').

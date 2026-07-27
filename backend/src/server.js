@@ -114,7 +114,14 @@ app.use(express.json({ limit: '10mb' }));
 app.get('/api/health', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
 
 // Rate limiting: estricto en autenticación (fuerza bruta + bcrypt), general en el resto.
-app.use(['/api/auth/login', '/api/portal/login', '/api/portal/registro', '/api/portal/recuperar', '/api/portal/otp'], authLimiter);
+// Nota: del 2FA solo se limitan los endpoints sensibles. `/2fa/estado` es una
+// lectura autenticada que se consulta al abrir el perfil — dentro de este limitador
+// (30 req por IP / 15 min, compartido por todo el taller tras un mismo router) se
+// agotaría con el uso normal y terminaría bloqueando logins legítimos.
+app.use([
+  '/api/auth/login', '/api/auth/2fa/verificar', '/api/auth/2fa/activar', '/api/auth/2fa/desactivar',
+  '/api/portal/login', '/api/portal/registro', '/api/portal/recuperar', '/api/portal/otp',
+], authLimiter);
 app.use('/api', apiLimiter);
 app.use('/api/admin', adminLimiter);
 

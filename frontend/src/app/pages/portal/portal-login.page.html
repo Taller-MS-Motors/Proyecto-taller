@@ -8,7 +8,32 @@
       <p>Iniciá sesión para continuar</p>
     </div>
 
-    <ion-card>
+    <!-- PASO 2: verificación en dos pasos (personal con 2FA activo) -->
+    <ion-card *ngIf="paso2fa" class="dosfa-card">
+      <ion-card-content>
+        <div class="dosfa-head">
+          <ion-icon name="shield-checkmark-outline"></ion-icon>
+          <h2>Verificación en dos pasos</h2>
+          <p>Abrí tu app de autenticación y escribí el código de 6 dígitos.</p>
+        </div>
+
+        <ion-item lines="none">
+          <ion-label position="stacked">Código</ion-label>
+          <ion-input type="tel" inputmode="numeric" autocomplete="one-time-code" maxlength="9"
+                     [(ngModel)]="codigo2fa" placeholder="000000" (keyup.enter)="verificar2fa()"></ion-input>
+        </ion-item>
+
+        <ion-button expand="block" (click)="verificar2fa()" [disabled]="!codigo2fa || verificando2fa">
+          {{ verificando2fa ? 'Verificando...' : 'Verificar' }}
+          <ion-icon *ngIf="!verificando2fa" name="arrow-forward-outline" slot="end"></ion-icon>
+        </ion-button>
+
+        <p class="dosfa-ayuda">¿Perdiste el teléfono? Usá uno de tus códigos de respaldo.</p>
+        <a class="portal-link sub codigo-toggle" (click)="cancelar2fa()">Volver</a>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card *ngIf="!paso2fa">
       <ion-card-content>
         <ion-item lines="full">
           <ion-label position="stacked">Correo</ion-label>
@@ -72,7 +97,7 @@
       </ion-card-content>
     </ion-card>
 
-    <a class="portal-link strong" routerLink="/portal/registro">Crear una cuenta</a>
-    <a *ngIf="modo === 'clave'" class="portal-link sub" routerLink="/portal/recuperar">¿Olvidaste tu contraseña?</a>
+    <a *ngIf="!paso2fa" class="portal-link strong" routerLink="/portal/registro">Crear una cuenta</a>
+    <a *ngIf="!paso2fa && modo === 'clave'" class="portal-link sub" routerLink="/portal/recuperar">¿Olvidaste tu contraseña?</a>
   </div>
 </ion-content>

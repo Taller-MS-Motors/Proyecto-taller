@@ -248,6 +248,18 @@ async function ensureSchema() {
     // Foto de perfil del personal (data URL base64, igual que clientes.foto).
     await addColumnIfMissing('usuarios', 'foto', 'MEDIUMTEXT NULL');
 
+    // Verificación en dos pasos (TOTP) del personal. Opt-in por cuenta.
+    //  · totp_secret: clave base32 compartida con la app de autenticación. Se guarda
+    //    apenas se inicia el alta, pero solo cuenta cuando totp_activado = 1.
+    //  · totp_backup: JSON con los hashes bcrypt de los códigos de respaldo (el texto
+    //    plano se muestra una única vez al activar y no queda en la base).
+    //  · totp_ultimo_contador: último período de 30 s ya consumido — impide reusar el
+    //    mismo código dentro de su ventana de validez (anti-replay).
+    await addColumnIfMissing('usuarios', 'totp_secret', 'VARCHAR(64) NULL');
+    await addColumnIfMissing('usuarios', 'totp_activado', 'TINYINT(1) NOT NULL DEFAULT 0');
+    await addColumnIfMissing('usuarios', 'totp_backup', 'TEXT NULL');
+    await addColumnIfMissing('usuarios', 'totp_ultimo_contador', 'BIGINT NULL');
+
     // Tareas del mecánico: checklist propio + asignadas por el admin (Fase C).
     await pool.query(`
       CREATE TABLE IF NOT EXISTS tareas_mecanico (

@@ -49,6 +49,15 @@ test('rechaza (403) un token sin rol', () => {
   assert.equal(llamado, false);
 });
 
+// 2FA: el token parcial (contraseña ok, falta el código) no es una sesión válida.
+test('rechaza (403) un token parcial de 2FA aunque traiga rol', () => {
+  const token = jwt.sign({ id: 3, rol: 'admin', pend2fa: true }, process.env.JWT_SECRET);
+  const res = fakeRes(); let llamado = false;
+  auth(reqCon(token), res, () => { llamado = true; });
+  assert.equal(res._status, 403);
+  assert.equal(llamado, false, 'un login a medias no debe abrir sesión');
+});
+
 test('acepta un token de staff y expone req.usuario', () => {
   const token = jwt.sign({ id: 5, rol: 'recepcion', nombre: 'Ana' }, process.env.JWT_SECRET);
   const req = reqCon(token); const res = fakeRes(); let llamado = false;

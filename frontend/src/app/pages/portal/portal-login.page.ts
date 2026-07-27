@@ -28,6 +28,13 @@ export class PortalLoginPage implements OnInit, OnDestroy {
   codigoEnviado = false;   // ya se pidió el código → mostrar el campo para escribirlo
   procesandoCodigo = false;
 
+  // Verificación en dos pasos del personal: la contraseña fue correcta pero falta
+  // el código de la app de autenticación. Guardamos el token parcial para canjearlo.
+  paso2fa = false;
+  tokenParcial = '';
+  codigo2fa = '';
+  verificando2fa = false;
+
   // Anti-bot para el pedido de código OTP: honeypot + captcha Turnstile.
   website = '';
   mostrarCaptcha = turnstileHabilitado();
@@ -104,11 +111,18 @@ export class PortalLoginPage implements OnInit, OnDestroy {
       next: async (res) => {
         await l.dismiss();
         const cred = { email: this.email.trim(), password: this.password };
-        if (res.data.tipo === 'staff' && res.data.usuario) {
+        // Personal con verificación en dos pasos: todavía no hay sesión, falta el código.
+        if (res.data.requiere_2fa && res.data.token_parcial) {
+          this.tokenParcial = res.data.token_parcial;
+          this.paso2fa = true;
+          this.codigo2fa = '';
+          return;
+        }
+        if (res.data.tipo === 'staff' && res.data.usuario && res.data.token) {
           this.auth.aplicarSesionStaff(res.data.token, res.data.usuario);
           await this.ofrecerBiometria(cred.email, cred.password);
           this.router.navigate([this.rutaStaff()], { replaceUrl: true });
-        } else if (res.data.cliente) {
+        } else if (res.data.cliente && res.data.token) {
           this.portal.aplicarSesion(res.data.token, res.data.cliente);
           await this.ofrecerBiometria(cred.email, cred.password);
           this.router.navigate(['/portal'], { replaceUrl: true });
@@ -124,6 +138,39 @@ export class PortalLoginPage implements OnInit, OnDestroy {
         await t.present();
       },
     });
+  }
+
+  // Canjea el código de la app de autenticación (o uno de respaldo) por la sesión.
+  async verificar2fa() {
+    const codigo = this.codigo2fa.trim();
+    if (!codigo || this.verificando2fa) return;
+    this.verificando2fa = true;
+    this.auth.verificar2FA(this.tokenParcial, codigo).pipe(takeUntil(this.destroy$)).subscribe({
+      next: async (res) => {
+        this.verificando2fa = false;
+        this.auth.aplicarSesionStaff(res.data.token, res.data.usuario);
+        this.router.navigate([this.rutaStaff()], { replaceUrl: true });
+      },
+      error: async (err) => {
+        this.verificando2fa = false;
+        this.codigo2fa = '';
+        // Si venció el token parcial (5 min), hay que empezar el login de nuevo.
+        if (err.status === 401) this.cancelar2fa();
+        const t = await this.toast.create({
+          message: err.error?.error || 'Código incorrecto',
+          duration: 2800, color: 'danger',
+        });
+        await t.present();
+      },
+    });
+  }
+
+  // Vuelve al formulario de contraseña (descarta el intento a medias).
+  cancelar2fa() {
+    this.paso2fa = false;
+    this.tokenParcial = '';
+    this.codigo2fa = '';
+    this.password = '';
   }
 
   // Cambia entre "contraseña" y "código al correo".
