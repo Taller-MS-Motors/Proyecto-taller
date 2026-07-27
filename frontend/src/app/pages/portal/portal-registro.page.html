@@ -47,6 +47,13 @@
           </ion-input>
         </ion-item>
 
+        <!-- Honeypot anti-bot: oculto para humanos, un bot que llena todo lo completa. -->
+        <input type="text" [(ngModel)]="website" name="website" tabindex="-1" autocomplete="off"
+               aria-hidden="true" class="hp-field">
+
+        <!-- Captcha invisible (Cloudflare Turnstile); solo si está configurado. -->
+        <div #tsBox *ngIf="mostrarCaptcha" class="turnstile-box"></div>
+
         <ion-button expand="block" (click)="registrar()" [disabled]="!valido">
           Crear cuenta
           <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>

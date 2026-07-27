@@ -13,6 +13,13 @@ export interface ClientePortal {
   foto?: string | null;
 }
 
+// Campos anti-bot que acompañan a los formularios públicos: honeypot (website, debe
+// ir vacío) y token del captcha Turnstile. Ambos opcionales (degradación segura).
+export interface AntiBot {
+  website?: string;
+  turnstileToken?: string;
+}
+
 const TOKEN_KEY = 'tallerms_portal_token';
 const CLIENTE_KEY = 'tallerms_portal_cliente';
 const nativo = Capacitor.isNativePlatform();
@@ -50,15 +57,15 @@ export class PortalService {
     );
   }
 
-  registro(data: { nombre: string; apellido: string; telefono: string; email: string; cedula?: string; password: string }): Observable<{ data: { token: string; cliente: ClientePortal } }> {
+  registro(data: { nombre: string; apellido: string; telefono: string; email: string; cedula?: string; password: string; website?: string; turnstileToken?: string }): Observable<{ data: { token: string; cliente: ClientePortal } }> {
     return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/registro`, data).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.cliente))
     );
   }
 
   // Paso 1: pide que envíen un código de recuperación al correo (respuesta genérica).
-  solicitarCodigo(email: string): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.url}/recuperar/solicitar`, { email });
+  solicitarCodigo(email: string, antibot: AntiBot = {}): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.url}/recuperar/solicitar`, { email, ...antibot });
   }
 
   // Paso 2: valida el código y define la nueva contraseña (auto-login).
@@ -69,8 +76,8 @@ export class PortalService {
   }
 
   // Ingreso sin contraseña (OTP). Paso 1: pide el código al correo (respuesta genérica).
-  solicitarCodigoLogin(email: string): Observable<{ message: string }> {
-    return this.http.post<{ message: string }>(`${this.url}/otp/solicitar`, { email });
+  solicitarCodigoLogin(email: string, antibot: AntiBot = {}): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.url}/otp/solicitar`, { email, ...antibot });
   }
 
   // Paso 2: valida el código y entra (auto-login, guarda la sesión).

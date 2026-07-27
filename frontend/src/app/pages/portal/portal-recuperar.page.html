@@ -58,6 +58,11 @@
       </ion-card-content>
     </ion-card>
 
+    <!-- Anti-bot (fuera de los cards para persistir entre pasos): honeypot + captcha. -->
+    <input type="text" [(ngModel)]="website" name="website" tabindex="-1" autocomplete="off"
+           aria-hidden="true" class="hp-field">
+    <div #tsBox *ngIf="mostrarCaptcha" class="turnstile-box"></div>
+
     <a class="portal-link" (click)="irLogin()">Volver a iniciar sesión</a>
   </div>
 </ion-content>
