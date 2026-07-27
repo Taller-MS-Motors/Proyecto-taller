@@ -31,9 +31,77 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <meta name="apple-mobile-web-app-title" content="MS Motos" />
   <link rel="apple-touch-icon" href="assets/logo/ms-iso.png" />
+
+  <!-- Pantalla de arranque ("Pulso mínimo"): cubre el instante entre el HTML
+       inicial y la primera pantalla real de Angular (tanto en web como justo
+       después del splash nativo en la app). Mismo carmesí que el splash nativo
+       (capacitor.config.ts) para que la transición sea continua, sin salto de color. -->
+  <style>
+    #boot-splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #E11D48;
+      transition: opacity .35s ease;
+    }
+    #boot-splash.hide { opacity: 0; pointer-events: none; }
+    .boot-glow {
+      position: absolute;
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255, 255, 255, .35), transparent 70%);
+      opacity: 0;
+      transform: scale(.7);
+      animation: boot-glow .9s ease-out forwards;
+    }
+    .boot-mark {
+      position: relative;
+      width: 84px;
+      height: 84px;
+      opacity: 0;
+      transform: scale(.94);
+      animation: boot-mark .9s cubic-bezier(.2, .7, .3, 1) forwards;
+    }
+    @keyframes boot-glow {
+      0%, 10% { opacity: 0; transform: scale(.7); }
+      38% { opacity: .7; transform: scale(1.15); }
+      70%, 100% { opacity: .25; transform: scale(1); }
+    }
+    @keyframes boot-mark {
+      0%, 8% { opacity: 0; transform: scale(.94); }
+      30%, 100% { opacity: 1; transform: scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .boot-glow, .boot-mark { animation-duration: .01ms !important; }
+    }
+  </style>
 </head>
 
 <body>
+  <div id="boot-splash" aria-hidden="true">
+    <div class="boot-glow"></div>
+    <img class="boot-mark" src="assets/logo/ms-iso-white.png" alt="" />
+  </div>
+  <script>
+    (function () {
+      var el = document.getElementById('boot-splash');
+      if (!el) return;
+      var hidden = false;
+      function hide() {
+        if (hidden) return;
+        hidden = true;
+        el.classList.add('hide');
+        setTimeout(function () { el.remove(); }, 400);
+      }
+      window.__hideBootSplash = hide;
+      // Salvavidas: si algo falla al iniciar Angular, no dejar la pantalla trabada.
+      setTimeout(hide, 4000);
+    })();
+  </script>
   <app-root></app-root>
 </body>
 
