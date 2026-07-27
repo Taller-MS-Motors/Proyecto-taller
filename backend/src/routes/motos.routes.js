@@ -6,6 +6,10 @@ const { anioValido, placaValida } = require('../utils/validar');
 
 router.use(auth);
 
+// Tope del listado global (ver comentario en clientes.routes.js): la búsqueda por `q`
+// y el filtro por cliente_id son server-side, así que no hace falta traer todo.
+const MAX_LISTADO = 500;
+
 router.get('/', async (req, res) => {
   try {
     const { q, cliente_id } = req.query;
@@ -25,7 +29,7 @@ router.get('/', async (req, res) => {
       const like = `%${q}%`;
       params.push(like, like, like);
     }
-    sql += ' ORDER BY m.created_at DESC';
+    sql += ` ORDER BY m.created_at DESC LIMIT ${MAX_LISTADO}`;
     const [rows] = await pool.query(sql, params);
     res.json({ data: rows });
   } catch (err) {

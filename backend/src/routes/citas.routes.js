@@ -12,6 +12,10 @@ const { textoDentroDeLimite } = require('../utils/validar');
 const ESTADOS = ['agendado', 'en_revision', 'en_mantenimiento', 'listo', 'entregado', 'cancelado'];
 const MAX_MOTIVO = 1000;
 
+// Tope del listado (ver comentario en clientes.routes.js): los filtros por fecha,
+// estado, técnico, sucursal y búsqueda son server-side.
+const MAX_LISTADO = 500;
+
 // Quién gestiona la agenda (crear/editar citas): mostrador y administración, NO el técnico.
 // El técnico solo mueve el estado de SUS citas (más abajo y en /api/mecanico).
 const GESTIONA_AGENDA = ['recepcion', 'admin'];
@@ -45,7 +49,7 @@ router.get('/', async (req, res) => {
       const like = `%${q}%`;
       params.push(like, like, like, like);
     }
-    sql += ' ORDER BY ci.fecha ASC, ci.hora ASC';
+    sql += ` ORDER BY ci.fecha ASC, ci.hora ASC LIMIT ${MAX_LISTADO}`;
     const [rows] = await pool.query(sql, params);
     res.json({ data: rows });
   } catch (err) {

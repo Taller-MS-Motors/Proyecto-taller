@@ -12,6 +12,10 @@ const { fotoValida, textoDentroDeLimite } = require('../utils/validar');
 
 const MAX_PROBLEMA_REPORTADO = 2000;
 
+// Tope del listado (ver comentario en clientes.routes.js): los filtros por estado,
+// técnico y rango de fechas son server-side.
+const MAX_LISTADO = 500;
+
 // Piso de rol: recepción o superior (recepción crea órdenes, el técnico las trabaja).
 // Sin esto, cualquier token válido podía leer/alterar órdenes ajenas y sus costos.
 router.use(auth, requireRol('recepcion'));
@@ -38,7 +42,7 @@ router.get('/', async (req, res) => {
     if (tecnico_id) { sql += ' AND ot.tecnico_id = ?'; params.push(tecnico_id); }
     if (fecha_desde) { sql += ' AND DATE(ot.fecha_ingreso) >= ?'; params.push(fecha_desde); }
     if (fecha_hasta) { sql += ' AND DATE(ot.fecha_ingreso) <= ?'; params.push(fecha_hasta); }
-    sql += ' ORDER BY ot.fecha_ingreso DESC';
+    sql += ` ORDER BY ot.fecha_ingreso DESC LIMIT ${MAX_LISTADO}`;
     const [rows] = await pool.query(sql, params);
     res.json({ data: rows });
   } catch (err) {

@@ -435,6 +435,10 @@ async function ensureSchema() {
     await crearIndiceSiFalta('mensajes_internos', 'idx_msg_par', '(remitente_id, destino_id, created_at)');
     await crearIndiceSiFalta('mensajes_internos', 'idx_msg_destino_created', '(destino_id, created_at)');
 
+    // El listado de clientes filtra por activo y ordena por nombre/apellido: sin este
+    // índice MySQL escanea la tabla entera y hace filesort en cada carga del módulo.
+    await crearIndiceSiFalta('clientes', 'idx_clientes_activo_nombre', '(activo, nombre, apellido)');
+
     // FK constraints en columnas agregadas por addColumnIfMissing (integridad referencial).
     await tryStep('fk citas.tecnico_id', () => addFkIfMissing('citas', 'fk_citas_tecnico', 'tecnico_id', 'usuarios', 'id'));
     await tryStep('fk citas.orden_id', () => addFkIfMissing('citas', 'fk_citas_orden', 'orden_id', 'ordenes_trabajo', 'id'));

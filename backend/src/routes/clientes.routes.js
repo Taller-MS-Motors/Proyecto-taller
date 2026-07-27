@@ -17,6 +17,11 @@ const COLS = `id, nombre, apellido, telefono, email, cedula, direccion, activo, 
               visitas, cortesia_disponible,
               (password_hash IS NOT NULL) AS tiene_portal`;
 
+// Tope del listado: con miles de clientes, devolverlos todos hace respuestas de varios
+// MB que tardan más en viajar y renderizar que en consultarse. La búsqueda por `q` es
+// server-side, así que para llegar a uno puntual se filtra en vez de traer todo.
+const MAX_LISTADO = 500;
+
 router.get('/', async (req, res) => {
   try {
     const { q } = req.query;
@@ -27,7 +32,7 @@ router.get('/', async (req, res) => {
       const like = `%${q}%`;
       params.push(like, like, like, like);
     }
-    sql += ' ORDER BY nombre, apellido';
+    sql += ` ORDER BY nombre, apellido LIMIT ${MAX_LISTADO}`;
     const [rows] = await pool.query(sql, params);
     res.json({ data: rows });
   } catch (err) {
