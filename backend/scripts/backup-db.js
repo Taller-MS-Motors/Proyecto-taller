@@ -12,6 +12,7 @@
 //   1. el argumento:            node scripts/backup-db.js "mysql://user:pass@host:puerto/base"
 //   2. la variable BACKUP_DB_URL
 //   3. la variable MYSQL_PUBLIC_URL   (la que expone Railway)
+//   4. el CLI de Railway, si estás logueado (lo normal: no hay que pegar nada)
 //
 // Los respaldos van a backend/backups/ (ignorada por git: contienen datos reales).
 
@@ -19,6 +20,7 @@ const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { varRailway } = require('./railway-var');
 
 const CONSERVAR = 10;                    // cuántos respaldos se mantienen
 const DIR = path.join(__dirname, '..', 'backups');
@@ -69,10 +71,12 @@ function rotar() {
   }
 }
 
-const url = process.argv[2] || process.env.BACKUP_DB_URL || process.env.MYSQL_PUBLIC_URL;
+const url = process.argv[2] || process.env.BACKUP_DB_URL || process.env.MYSQL_PUBLIC_URL
+  || varRailway('MySQL', 'MYSQL_PUBLIC_URL');
 if (!url) {
   console.error('❌ Falta la URL de la base.');
-  console.error('   Pasala como argumento o definí BACKUP_DB_URL / MYSQL_PUBLIC_URL.');
+  console.error('   Lo normal es que la lea sola del CLI de Railway: probá `railway login`.');
+  console.error('   Si no, pasala como argumento o definí BACKUP_DB_URL / MYSQL_PUBLIC_URL.');
   console.error('   La encontrás en Railway → servicio MySQL → Variables → MYSQL_PUBLIC_URL');
   process.exit(1);
 }
