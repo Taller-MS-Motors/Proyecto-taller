@@ -89,6 +89,25 @@ async function ensureSchema() {
       )
     `);
 
+    // Verificación de correo al auto-registrarse en el portal (anti-bot: exige probar
+    // que se controla la bandeja antes de otorgar sesión). DEFAULT 1: los clientes que
+    // ya existían (cargados por el taller, o registrados antes de este cambio) no quedan
+    // bloqueados; el registro público es el único camino que arranca en 0.
+    await addColumnIfMissing('clientes', 'email_verificado', 'TINYINT(1) NOT NULL DEFAULT 1');
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS email_verify_codes (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        cliente_id INT NOT NULL,
+        code_hash  VARCHAR(255) NOT NULL,
+        expires_at DATETIME NOT NULL,
+        used       TINYINT(1) DEFAULT 0,
+        attempts   INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_verify_cliente (cliente_id),
+        FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+      )
+    `);
+
     // Aprobación digital del presupuesto por parte del cliente.
     await addColumnIfMissing(
       'ordenes_trabajo', 'aprobacion_cliente',

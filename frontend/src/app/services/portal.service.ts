@@ -57,10 +57,22 @@ export class PortalService {
     );
   }
 
-  registro(data: { nombre: string; apellido: string; telefono: string; email: string; cedula?: string; password: string; website?: string; turnstileToken?: string }): Observable<{ data: { token: string; cliente: ClientePortal } }> {
-    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/registro`, data).pipe(
+  // Ya NO abre sesión: crea la cuenta sin verificar y manda un código al correo.
+  // El llamador sigue a verificarRegistro() para completar el ingreso.
+  registro(data: { nombre: string; apellido: string; telefono: string; email: string; cedula?: string; password: string; website?: string; turnstileToken?: string }): Observable<{ data: { requiere_verificacion: boolean; email: string }; message: string }> {
+    return this.http.post<{ data: { requiere_verificacion: boolean; email: string }; message: string }>(`${this.url}/registro`, data);
+  }
+
+  // Paso 2 del registro: confirma el código de 6 dígitos y recién ahí entra (auto-login).
+  verificarRegistro(email: string, codigo: string): Observable<{ data: { token: string; cliente: ClientePortal } }> {
+    return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/registro/verificar`, { email, codigo }).pipe(
       tap(res => this.guardarSesion(res.data.token, res.data.cliente))
     );
+  }
+
+  // Pide un código de verificación nuevo (no llegó / venció). Respuesta genérica.
+  reenviarVerificacion(email: string, antibot: AntiBot = {}): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.url}/registro/reenviar`, { email, ...antibot });
   }
 
   // Paso 1: pide que envíen un código de recuperación al correo (respuesta genérica).

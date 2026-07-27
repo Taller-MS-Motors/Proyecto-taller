@@ -107,6 +107,20 @@ function plantillaCodigoLogin(nombre, codigo) {
   return envoltorio('Taller MS', 'Tu código de ingreso', cuerpo);
 }
 
+function plantillaCodigoVerificacion(nombre, codigo) {
+  const cuerpo = `
+    ${parrafo(`Hola${nombre ? ' ' + escapar(nombre) : ''}, ¡bienvenido! Usá este código para confirmar tu correo y activar tu cuenta. Vence en 10 minutos.`)}
+    <div style="text-align:center;padding:12px 0 8px;">
+      <div style="display:inline-block;background:#0a0a0a;border:1px solid #be123c;border-radius:16px;padding:18px 28px;">
+        <span style="color:#fafafa;font-size:38px;font-weight:700;letter-spacing:10px;font-family:'JetBrains Mono','Courier New',monospace;">${escapar(codigo)}</span>
+      </div>
+    </div>
+    <p style="color:#737373;font-size:12px;line-height:1.5;margin:12px 0 0;">
+      Si no creaste esta cuenta, podés ignorar este correo.
+    </p>`;
+  return envoltorio('Taller MS', 'Confirmá tu correo', cuerpo);
+}
+
 function plantillaRecordatorio({ nombre, hora, servicio, moto, sucursal, taller }) {
   const donde = sucursal ? ` en ${escapar(sucursal)}` : '';
   const cuerpo = `
@@ -153,6 +167,16 @@ async function enviarCodigoLogin(email, nombre, codigo) {
   });
 }
 
+// Código para confirmar el correo al auto-registrarse en el portal.
+async function enviarCodigoVerificacion(email, nombre, codigo) {
+  return enviarCorreo({
+    to: email,
+    subject: 'Confirmá tu correo',
+    html: plantillaCodigoVerificacion(nombre, codigo),
+    devLog: `Código de verificación para ${email}: ${codigo}`,
+  });
+}
+
 // Recordatorio de la cita del día siguiente.
 async function enviarRecordatorioCita(email, datos) {
   return enviarCorreo({
@@ -173,4 +197,7 @@ async function enviarAvisoEstado(email, datos) {
   });
 }
 
-module.exports = { enviarCorreo, enviarCodigoReset, enviarCodigoLogin, enviarRecordatorioCita, enviarAvisoEstado };
+module.exports = {
+  enviarCorreo, enviarCodigoReset, enviarCodigoLogin, enviarCodigoVerificacion,
+  enviarRecordatorioCita, enviarAvisoEstado,
+};

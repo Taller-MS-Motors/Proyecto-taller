@@ -1,5 +1,5 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, ViewChild } from '@angular/core';
-import { Router } from '@angular/router';
+import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
@@ -13,7 +13,7 @@ import { montarTurnstile, turnstileHabilitado, TurnstileWidget } from '../../sha
   templateUrl: './portal-registro.page.html',
   styleUrls: ['./portal-login.page.scss'],
 })
-export class PortalRegistroPage implements AfterViewInit, OnDestroy {
+export class PortalRegistroPage implements OnInit, AfterViewInit, OnDestroy {
   private destroy$ = new Subject<void>();
   nombre = '';
   apellido = '';
@@ -31,12 +31,32 @@ export class PortalRegistroPage implements AfterViewInit, OnDestroy {
   @ViewChild('tsBox') tsBox?: ElementRef<HTMLElement>;
   private ts?: TurnstileWidget;
 
+  // Paso 2: confirmar el correo con el código de 6 dígitos que se manda al crear la cuenta.
+  paso: 1 | 2 = 1;
+  codigo = '';
+  verificando = false;
+  reenviando = false;
+  cooldown = 0;
+  private timer?: any;
+
   constructor(
     private portal: PortalService,
     private router: Router,
+    private route: ActivatedRoute,
     private loading: LoadingController,
     private toast: ToastController
   ) {}
+
+  // Si venís del login porque tu cuenta existe pero no está verificada
+  // (?verificar=1&email=...), saltamos directo al paso 2 con un código fresco.
+  ngOnInit() {
+    const qp = this.route.snapshot.queryParamMap;
+    if (qp.get('verificar') === '1' && qp.get('email')) {
+      this.email = qp.get('email')!;
+      this.paso = 2;
+      this.reenviar();
+    }
+  }
 
   async ngAfterViewInit() {
     if (this.tsBox) this.ts = await montarTurnstile(this.tsBox.nativeElement);
@@ -64,8 +84,9 @@ export class PortalRegistroPage implements AfterViewInit, OnDestroy {
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: async () => {
         await l.dismiss();
-        this.mostrar('¡Cuenta creada!');
-        this.router.navigate(['/portal'], { replaceUrl: true });
+        this.paso = 2;
+        this.iniciarCooldown();
+        this.mostrar('Te enviamos un código para confirmar tu correo');
       },
       error: async (err) => {
         await l.dismiss();
@@ -75,7 +96,46 @@ export class PortalRegistroPage implements AfterViewInit, OnDestroy {
     });
   }
 
-  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); this.ts?.destroy(); }
+  // Confirma el código y entra (el backend ya guarda la sesión vía guardarSesion).
+  async verificar() {
+    if (!this.codigo || this.codigo.trim().length < 4 || this.verificando) return;
+    this.verificando = true;
+    this.portal.verificarRegistro(this.email.trim(), this.codigo.trim()).pipe(takeUntil(this.destroy$)).subscribe({
+      next: async () => {
+        this.verificando = false;
+        this.mostrar('¡Cuenta confirmada!');
+        this.router.navigate(['/portal'], { replaceUrl: true });
+      },
+      error: async (err) => {
+        this.verificando = false;
+        this.codigo = '';
+        this.mostrar(err.error?.error || 'Código inválido o expirado', 'danger');
+      },
+    });
+  }
+
+  reenviar() {
+    if (this.cooldown > 0 || this.reenviando) return;
+    this.reenviando = true;
+    this.portal.reenviarVerificacion(this.email.trim()).pipe(takeUntil(this.destroy$)).subscribe({
+      next: async () => { this.reenviando = false; this.iniciarCooldown(); this.mostrar('Te enviamos un código nuevo'); },
+      error: async (err) => { this.reenviando = false; this.mostrar(err.error?.error || 'No se pudo reenviar', 'danger'); },
+    });
+  }
+
+  private iniciarCooldown() {
+    this.cooldown = 30;
+    if (this.timer) clearInterval(this.timer);
+    this.timer = setInterval(() => {
+      this.cooldown--;
+      if (this.cooldown <= 0) clearInterval(this.timer);
+    }, 1000);
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next(); this.destroy$.complete(); this.ts?.destroy();
+    if (this.timer) clearInterval(this.timer);
+  }
 
   irLogin() {
     this.router.navigate(['/portal/login']);

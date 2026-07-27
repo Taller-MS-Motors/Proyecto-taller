@@ -5,10 +5,12 @@
         <img src="assets/logo/ms-iso-white.png" alt="MS Motos" />
       </div>
       <h1>Crear cuenta</h1>
-      <p>Seguí el estado de tu moto</p>
+      <p *ngIf="paso === 1">Seguí el estado de tu moto</p>
+      <p *ngIf="paso === 2">Escribí el código que te llegó a {{ email }}</p>
     </div>
 
-    <ion-card>
+    <!-- Paso 1: datos de la cuenta -->
+    <ion-card *ngIf="paso === 1">
       <ion-card-content>
         <ion-item lines="full">
           <ion-label position="stacked">Nombre</ion-label>
@@ -47,13 +49,6 @@
           </ion-input>
         </ion-item>
 
-        <!-- Honeypot anti-bot: oculto para humanos, un bot que llena todo lo completa. -->
-        <input type="text" [(ngModel)]="website" name="website" tabindex="-1" autocomplete="off"
-               aria-hidden="true" class="hp-field">
-
-        <!-- Captcha invisible (Cloudflare Turnstile); solo si está configurado. -->
-        <div #tsBox *ngIf="mostrarCaptcha" class="turnstile-box"></div>
-
         <ion-button expand="block" (click)="registrar()" [disabled]="!valido">
           Crear cuenta
           <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
@@ -61,6 +56,30 @@
       </ion-card-content>
     </ion-card>
 
-    <a class="portal-link" (click)="irLogin()">¿Ya tenés cuenta? Iniciá sesión</a>
+    <!-- Paso 2: confirmar el correo -->
+    <ion-card *ngIf="paso === 2">
+      <ion-card-content>
+        <ion-item lines="full">
+          <ion-label position="stacked">Código de 6 dígitos</ion-label>
+          <ion-input type="text" inputmode="numeric" maxlength="6" [(ngModel)]="codigo" placeholder="000000" (keyup.enter)="verificar()"></ion-input>
+        </ion-item>
+        <p class="ayuda-correo">El código puede tardar un par de minutos. Si no llega, revisá la carpeta de spam.</p>
+
+        <ion-button expand="block" (click)="verificar()" [disabled]="!codigo || verificando">
+          {{ verificando ? 'Verificando...' : 'Confirmar' }}
+        </ion-button>
+
+        <a class="portal-link sub" [class.disabled]="cooldown > 0 || reenviando" (click)="reenviar()">
+          {{ cooldown > 0 ? 'Reenviar código en ' + cooldown + 's' : 'Reenviar código' }}
+        </a>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Anti-bot (fuera de los cards para persistir entre pasos): honeypot + captcha. -->
+    <input type="text" [(ngModel)]="website" name="website" tabindex="-1" autocomplete="off"
+           aria-hidden="true" class="hp-field">
+    <div #tsBox *ngIf="mostrarCaptcha" class="turnstile-box"></div>
+
+    <a *ngIf="paso === 1" class="portal-link" (click)="irLogin()">¿Ya tenés cuenta? Iniciá sesión</a>
   </div>
 </ion-content>

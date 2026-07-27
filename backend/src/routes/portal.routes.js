@@ -11,7 +11,7 @@ const {
 const MAX_MOTIVO = 1000;
 const MAX_MOTIVO_RECHAZO = 1000;
 const { consumir } = require('../utils/rate-limit');
-const { enviarCodigoReset, enviarCodigoLogin } = require('../services/mailer');
+const { enviarCodigoReset, enviarCodigoLogin, enviarCodigoVerificacion } = require('../services/mailer');
 const { antibot } = require('../utils/antibot');
 const { SERVICIOS } = require('../utils/servicios');
 const { getConfig, horasDisponibles } = require('../utils/configuracion');
@@ -66,6 +66,12 @@ router.post('/login', async (req, res) => {
     const ok = await bcrypt.compare(password, cliente.password_hash);
     if (!ok) return res.status(401).json({ error: 'Credenciales incorrectas' });
 
+    // La contraseña ya se comprobó correcta (no hay riesgo de enumeración en avisar
+    // esto acá): falta confirmar el correo antes de otorgar sesión.
+    if (!cliente.email_verificado) {
+      return res.status(403).json({ error: 'Confirmá tu correo para entrar. Te enviamos un código al registrarte.', requiere_verificacion: true });
+    }
+
     const { payload, token } = tokenCliente(cliente);
     // La foto va en la respuesta (para el avatar del header) pero NO en el JWT.
     res.json({ data: { token, cliente: { ...payload, foto: cliente.foto || null } } });
@@ -74,7 +80,23 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// POST /api/portal/registro — auto-registro del cliente (público)
+// Genera, guarda y envía un código de verificación de correo (10 min, un solo uso).
+// Invalida los códigos previos del cliente para que solo el último sea válido.
+async function enviarVerificacion(clienteId, email, nombre) {
+  const codigo = String(Math.floor(100000 + Math.random() * 900000)); // 6 dígitos
+  const codeHash = await bcrypt.hash(codigo, 10);
+  await pool.query('UPDATE email_verify_codes SET used = 1 WHERE cliente_id = ? AND used = 0', [clienteId]);
+  await pool.query(
+    'INSERT INTO email_verify_codes (cliente_id, code_hash, expires_at) VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))',
+    [clienteId, codeHash]
+  );
+  await enviarCodigoVerificacion(email, nombre, codigo);
+}
+
+// POST /api/portal/registro — auto-registro del cliente (público). NO abre sesión:
+// crea la cuenta sin verificar y manda un código de 6 dígitos al correo. La sesión
+// se otorga recién en /registro/verificar, cuando se prueba que se controla ese correo
+// (cierra el hueco de bots que se registraban en masa con emails inventados).
 router.post('/registro', antibot(), async (req, res) => {
   try {
     const { nombre, apellido, telefono, email, cedula, password } = req.body;
@@ -100,23 +122,96 @@ router.post('/registro', antibot(), async (req, res) => {
       if (existente.password_hash) {
         return res.status(409).json({ error: 'Ese correo ya tiene una cuenta. Iniciá sesión.' });
       }
-      // El taller ya tenía registrado al cliente: "reclama" la cuenta definiendo su contraseña
+      // El taller ya tenía registrado al cliente: "reclama" la cuenta definiendo su
+      // contraseña. Igual exige verificar el correo — sin esto, cualquiera que supiera
+      // el email de un cliente ya cargado por el taller podía apropiarse de su cuenta.
       await pool.query(
-        'UPDATE clientes SET password_hash = ?, cedula = COALESCE(cedula, ?) WHERE id = ?',
+        'UPDATE clientes SET password_hash = ?, cedula = COALESCE(cedula, ?), email_verificado = 0 WHERE id = ?',
         [hash, cedula || null, existente.id]
       );
       clienteId = existente.id;
     } else {
       const [result] = await pool.query(
-        'INSERT INTO clientes (nombre, apellido, telefono, email, cedula, password_hash) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO clientes (nombre, apellido, telefono, email, cedula, password_hash, email_verificado) VALUES (?, ?, ?, ?, ?, ?, 0)',
         [nombre, apellido, telefono, email, cedula || null, hash]
       );
       clienteId = result.insertId;
     }
 
-    const [[cliente]] = await pool.query('SELECT id, nombre, apellido FROM clientes WHERE id = ?', [clienteId]);
+    await enviarVerificacion(clienteId, email, nombre);
+    res.status(201).json({ data: { requiere_verificacion: true, email }, message: 'Te enviamos un código para confirmar tu correo.' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/portal/registro/verificar — confirma el código y recién ahí otorga sesión.
+router.post('/registro/verificar', async (req, res) => {
+  try {
+    const { email, codigo } = req.body;
+    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+    if (!codigo) return res.status(400).json({ error: 'El código es requerido' });
+
+    const [[cliente]] = await pool.query(
+      'SELECT id, nombre, apellido, email_verificado FROM clientes WHERE email = ? AND activo = 1', [email]
+    );
+    const ERR_CODIGO = 'Código inválido o expirado';
+    if (!cliente) return res.status(400).json({ error: ERR_CODIGO });
+
+    // Idempotente: si ya se verificó (p. ej. doble clic), simplemente entra.
+    if (cliente.email_verificado) {
+      const { payload, token } = tokenCliente(cliente);
+      return res.json({ data: { token, cliente: payload } });
+    }
+
+    const limite = consumir(`registro-verificar:${String(email).trim().toLowerCase()}`, { porMinuto: 5, porHora: 20 });
+    if (!limite.ok) {
+      return res.status(429).json({ error: `Demasiados intentos. Esperá ${limite.retryAfter}s e intentá de nuevo.` });
+    }
+
+    const [[reg]] = await pool.query(
+      `SELECT id, code_hash, attempts FROM email_verify_codes
+       WHERE cliente_id = ? AND used = 0 AND expires_at > NOW()
+       ORDER BY created_at DESC LIMIT 1`,
+      [cliente.id]
+    );
+    if (!reg || reg.attempts >= 5) return res.status(400).json({ error: ERR_CODIGO });
+
+    const ok = await bcrypt.compare(String(codigo).trim(), reg.code_hash);
+    if (!ok) {
+      await pool.query('UPDATE email_verify_codes SET attempts = attempts + 1 WHERE id = ?', [reg.id]);
+      return res.status(400).json({ error: ERR_CODIGO });
+    }
+
+    await pool.query('UPDATE email_verify_codes SET used = 1 WHERE id = ?', [reg.id]);
+    await pool.query('UPDATE clientes SET email_verificado = 1 WHERE id = ?', [cliente.id]);
+
     const { payload, token } = tokenCliente(cliente);
-    res.status(201).json({ data: { token, cliente: payload } });
+    res.json({ data: { token, cliente: payload } });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// POST /api/portal/registro/reenviar — pide un código nuevo (p. ej. si no llegó o venció).
+// Respuesta genérica (anti-enumeración) y protegido con el mismo honeypot/captcha que
+// el registro, para que no sirva como vector de bombardeo de correos.
+router.post('/registro/reenviar', antibot(), async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
+
+    const limite = consumir(`registro-reenviar:${String(email).trim().toLowerCase()}`, { porMinuto: 1, porHora: 5 });
+    if (!limite.ok) {
+      return res.status(429).json({ error: `Esperá ${limite.retryAfter}s antes de pedir otro código.` });
+    }
+
+    const [[cliente]] = await pool.query(
+      'SELECT id, nombre FROM clientes WHERE email = ? AND activo = 1 AND email_verificado = 0', [email]
+    );
+    if (cliente) await enviarVerificacion(cliente.id, email, cliente.nombre);
+
+    res.json({ message: 'Si tu cuenta está pendiente de verificar, te enviamos un nuevo código.' });
   } catch (err) {
     fail(res, err);
   }
@@ -188,8 +283,10 @@ router.post('/recuperar/confirmar', async (req, res) => {
       return res.status(400).json({ error: ERR_CODIGO });
     }
 
+    // Completar el reset por correo prueba que se controla la bandeja: de paso
+    // verifica la cuenta (cierra el reset como atajo para "reclamar" sin verificar).
     const hash = await bcrypt.hash(password, 10);
-    await pool.query('UPDATE clientes SET password_hash = ? WHERE id = ?', [hash, cliente.id]);
+    await pool.query('UPDATE clientes SET password_hash = ?, email_verificado = 1 WHERE id = ?', [hash, cliente.id]);
     await pool.query('UPDATE password_reset_codes SET used = 1 WHERE id = ?', [reg.id]);
 
     const { payload, token } = tokenCliente(cliente);
@@ -267,6 +364,9 @@ router.post('/otp/verificar', async (req, res) => {
     }
 
     await pool.query('UPDATE login_codes SET used = 1 WHERE id = ?', [reg.id]);
+    // Entrar con el código por correo prueba lo mismo que la verificación de registro:
+    // se controla la bandeja. Se promueve sin fricción extra.
+    await pool.query('UPDATE clientes SET email_verificado = 1 WHERE id = ? AND email_verificado = 0', [cliente.id]);
     const { payload, token } = tokenCliente(cliente);
     res.json({ data: { token, cliente: { ...payload, foto: cliente.foto || null } } });
   } catch (err) {

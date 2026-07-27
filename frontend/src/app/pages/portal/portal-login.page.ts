@@ -136,6 +136,11 @@ export class PortalLoginPage implements OnInit, OnDestroy {
           color: 'danger',
         });
         await t.present();
+        // Cuenta creada pero con el correo sin confirmar: la mandamos a completar
+        // ese paso (la pantalla de registro pide un código nuevo al abrirse).
+        if (err.status === 403 && err.error?.requiere_verificacion) {
+          this.router.navigate(['/portal/registro'], { queryParams: { verificar: '1', email: this.email.trim() } });
+        }
       },
     });
   }
