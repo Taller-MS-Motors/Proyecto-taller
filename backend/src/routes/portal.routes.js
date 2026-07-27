@@ -4,7 +4,12 @@ const bcrypt = require('bcrypt');
 const { pool } = require('../db/pool');
 const { fail } = require('../utils/responder');
 const authCliente = require('../middleware/auth-cliente');
-const { emailValido, fotoValida } = require('../utils/validar');
+const {
+  emailValido, fotoValida, textoDentroDeLimite, cedulaValida, telefonoValido, anioValido, placaValida,
+} = require('../utils/validar');
+
+const MAX_MOTIVO = 1000;
+const MAX_MOTIVO_RECHAZO = 1000;
 const { consumir } = require('../utils/rate-limit');
 const { enviarCodigoReset, enviarCodigoLogin } = require('../services/mailer');
 const { antibot } = require('../utils/antibot');
@@ -78,6 +83,8 @@ router.post('/registro', antibot(), async (req, res) => {
     }
     if (!emailValido(email)) return res.status(400).json({ error: 'El correo no tiene un formato válido' });
     if (password.length < 8) return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+    if (!telefonoValido(telefono)) return res.status(400).json({ error: 'El teléfono no tiene un formato válido' });
+    if (!cedulaValida(cedula)) return res.status(400).json({ error: 'La cédula no tiene un formato válido' });
 
     // Rate-limit por correo: frena el sondeo de cuentas existentes vía el 409 de abajo.
     const limite = consumir(`registro:${String(email).trim().toLowerCase()}`, { porMinuto: 3, porHora: 20 });
@@ -458,6 +465,9 @@ router.put('/perfil', async (req, res) => {
     if (!email || !emailValido(email)) {
       return res.status(400).json({ error: 'El correo no tiene un formato válido' });
     }
+    if (!telefonoValido(telefono)) {
+      return res.status(400).json({ error: 'El teléfono no tiene un formato válido' });
+    }
     // El correo es la llave de login: no permitir chocar con otra cuenta.
     const [[dup]] = await pool.query(
       'SELECT id FROM clientes WHERE email = ? AND id <> ? AND activo = 1',
@@ -691,7 +701,11 @@ router.post('/ordenes/:id/aprobar', async (req, res) => {
 // POST /api/portal/ordenes/:id/rechazar — el cliente rechaza el presupuesto
 router.post('/ordenes/:id/rechazar', async (req, res) => {
   try {
-    const ok = await actualizarAprobacion(req.params.id, req.cliente.id, 'rechazado', req.body.motivo || null);
+    const motivoRechazo = String(req.body.motivo || '').trim() || null;
+    if (!textoDentroDeLimite(motivoRechazo, MAX_MOTIVO_RECHAZO)) {
+      return res.status(400).json({ error: `motivo no puede exceder ${MAX_MOTIVO_RECHAZO} caracteres` });
+    }
+    const ok = await actualizarAprobacion(req.params.id, req.cliente.id, 'rechazado', motivoRechazo);
     if (!ok) return res.status(400).json({ error: 'La orden no está esperando aprobación' });
     res.json({ message: 'Presupuesto rechazado' });
   } catch (err) {
@@ -811,6 +825,8 @@ router.post('/motos', async (req, res) => {
     if (!marca || !modelo || !placa) {
       return res.status(400).json({ error: 'Marca, modelo y placa son requeridos' });
     }
+    if (!placaValida(placa)) return res.status(400).json({ error: 'La placa no tiene un formato válido' });
+    if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
     if (!fotoValida(foto)) return res.status(400).json({ error: 'La foto de la moto no es válida o es demasiado grande.' });
     // Bloquea placas ya registradas (normaliza espacios y guiones).
     const [[existe]] = await pool.query(
@@ -841,6 +857,8 @@ router.put('/motos/:id', async (req, res) => {
     if (!marca || !modelo || !placa) {
       return res.status(400).json({ error: 'Marca, modelo y placa son requeridos' });
     }
+    if (!placaValida(placa)) return res.status(400).json({ error: 'La placa no tiene un formato válido' });
+    if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
     if (!fotoValida(foto)) return res.status(400).json({ error: 'La foto de la moto no es válida o es demasiado grande.' });
     // La moto debe ser del cliente
     const [[moto]] = await pool.query('SELECT id FROM motos WHERE id = ? AND cliente_id = ? AND activa = 1', [req.params.id, req.cliente.id]);
@@ -1013,6 +1031,9 @@ router.put('/citas/:id', async (req, res) => {
     if (!moto) return res.status(400).json({ error: 'Moto no válida' });
 
     const motivo = (descripcion || '').trim() || tipo_servicio;
+    if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
+      return res.status(400).json({ error: `descripcion no puede exceder ${MAX_MOTIVO} caracteres` });
+    }
     // Sucursal efectiva: la nueva pedida, o la que ya tenía la cita (fallback al default).
     const sucursalId = sucursalPedida || cita.sucursal_id || (await sucursalPorDefecto());
 
@@ -1094,6 +1115,9 @@ router.post('/citas', async (req, res) => {
     if (!moto) return res.status(400).json({ error: 'Moto no válida' });
 
     const motivo = (descripcion || '').trim() || tipo_servicio;
+    if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
+      return res.status(400).json({ error: `descripcion no puede exceder ${MAX_MOTIVO} caracteres` });
+    }
 
     // Cupo atómico: una transacción bloquea el rango (fecha,hora) con FOR UPDATE,
     // cuenta y recién ahí inserta. Dos solicitudes simultáneas se serializan, así

@@ -17,4 +17,59 @@ function fotoValida(foto) {
   return typeof foto === 'string' && FOTO_RE.test(foto) && foto.length <= FOTO_MAX_LEN;
 }
 
-module.exports = { emailValido, fotoValida };
+// Verifica que un texto libre (ya trimeado) no exceda el tope de la app.
+// Tolera null/undefined/'' (la obligatoriedad se revisa aparte, en el llamador).
+function textoDentroDeLimite(str, max) {
+  if (str === null || str === undefined || str === '') return true;
+  return String(str).trim().length <= max;
+}
+
+// Cédula costarricense: física (9 dígitos), jurídica (10) o DIMEX/extranjero (11-12).
+// Acepta guiones/espacios como separadores, se comparan solo los dígitos.
+// Tolera vacío: la obligatoriedad se revisa aparte, en el llamador.
+const CEDULA_RE = /^\d{9,12}$/;
+function cedulaValida(cedula) {
+  if (cedula === null || cedula === undefined || cedula === '') return true;
+  const soloDigitos = String(cedula).replace(/[\s-]/g, '');
+  return CEDULA_RE.test(soloDigitos);
+}
+
+// Teléfono costarricense: 8 dígitos, con o sin indicativo +506.
+// Acepta guiones/espacios como separadores, se comparan solo los dígitos.
+// Tolera vacío: la obligatoriedad se revisa aparte, en el llamador.
+const TELEFONO_RE = /^(\+?506)?\d{8}$/;
+function telefonoValido(telefono) {
+  if (telefono === null || telefono === undefined || telefono === '') return true;
+  const soloDigitos = String(telefono).replace(/[\s-]/g, '');
+  return TELEFONO_RE.test(soloDigitos);
+}
+
+// Año de fabricación de la moto: entero entre 1980 y el año próximo (permite modelos "del año siguiente").
+// Tolera vacío: el campo es opcional en las rutas actuales.
+const ANIO_MINIMO = 1980;
+function anioValido(anio) {
+  if (anio === null || anio === undefined || anio === '') return true;
+  const n = Number(anio);
+  const anioMaximo = new Date().getFullYear() + 1;
+  return Number.isInteger(n) && n >= ANIO_MINIMO && n <= anioMaximo;
+}
+
+// Placa de moto: alfanumérica, entre 4 y 10 caracteres una vez quitados espacios/guiones
+// (mismo criterio de normalización que utils/placa.js). Tolera vacío: la obligatoriedad
+// se revisa aparte, en el llamador.
+const PLACA_RE = /^[A-Z0-9]{4,10}$/;
+function placaValida(placa) {
+  if (placa === null || placa === undefined || placa === '') return true;
+  const normalizada = String(placa).toUpperCase().replace(/[\s-]/g, '');
+  return PLACA_RE.test(normalizada);
+}
+
+module.exports = {
+  emailValido,
+  fotoValida,
+  textoDentroDeLimite,
+  cedulaValida,
+  telefonoValido,
+  anioValido,
+  placaValida,
+};

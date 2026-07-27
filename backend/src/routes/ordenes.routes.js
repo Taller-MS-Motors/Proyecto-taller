@@ -8,7 +8,9 @@ const { notificarPresupuestoListo } = require('../utils/notificaciones');
 const { TRANSICIONES_ORDEN, transicionPermitida } = require('../utils/transiciones');
 const { sucursalValida } = require('../utils/sucursales');
 const { LEIDO_POR_MI, VISTO_POR_OTRO, marcarLeidos } = require('../utils/mensajes');
-const { fotoValida } = require('../utils/validar');
+const { fotoValida, textoDentroDeLimite } = require('../utils/validar');
+
+const MAX_PROBLEMA_REPORTADO = 2000;
 
 // Piso de rol: recepción o superior (recepción crea órdenes, el técnico las trabaja).
 // Sin esto, cualquier token válido podía leer/alterar órdenes ajenas y sus costos.
@@ -53,8 +55,13 @@ router.post('/', async (req, res) => {
       prioridad, categoria, fecha_estimada_entrega,
     } = req.body;
 
-    if (!moto_id || !cliente_id || !problema_reportado) {
+    const problemaReportado = String(problema_reportado || '').trim();
+
+    if (!moto_id || !cliente_id || !problemaReportado) {
       return res.status(400).json({ error: 'moto_id, cliente_id y problema_reportado son requeridos' });
+    }
+    if (!textoDentroDeLimite(problemaReportado, MAX_PROBLEMA_REPORTADO)) {
+      return res.status(400).json({ error: `problema_reportado no puede exceder ${MAX_PROBLEMA_REPORTADO} caracteres` });
     }
 
     const PRIORIDADES_VALIDAS = ['baja', 'normal', 'alta', 'urgente'];
@@ -86,7 +93,7 @@ router.post('/', async (req, res) => {
            prioridad, categoria, fecha_estimada_entrega)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
-          numero_orden, moto_id, cliente_id, sucursal_id, req.usuario.id, problema_reportado,
+          numero_orden, moto_id, cliente_id, sucursal_id, req.usuario.id, problemaReportado,
           kilometraje_ingreso || null, nivel_combustible || 'cuarto',
           accesorios_entregados || null, estado_fisico || null,
           prioridad || 'normal', categoria || 'diagnostico',

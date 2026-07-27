@@ -5,6 +5,7 @@ const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
+const { cedulaValida, telefonoValido } = require('../utils/validar');
 
 // El CRUD de clientes (PII: cédula, dirección, edición) es tarea de recepción/admin.
 // Membresía exacta: el técnico queda excluido (su panel usa /api/mecanico, que ya
@@ -40,6 +41,8 @@ router.post('/', async (req, res) => {
     if (!nombre || !apellido || !telefono || !cedula) {
       return res.status(400).json({ error: 'Nombre, apellido, teléfono y cédula son requeridos' });
     }
+    if (!telefonoValido(telefono)) return res.status(400).json({ error: 'El teléfono no tiene un formato válido' });
+    if (!cedulaValida(cedula)) return res.status(400).json({ error: 'La cédula no tiene un formato válido' });
     const [result] = await pool.query(
       'INSERT INTO clientes (nombre, apellido, telefono, email, cedula, direccion) VALUES (?, ?, ?, ?, ?, ?)',
       [nombre, apellido, telefono, email || null, cedula || null, direccion || null]
@@ -122,6 +125,8 @@ router.patch('/:id/portal', requireRol('admin'), async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { nombre, apellido, telefono, email, cedula, direccion } = req.body;
+    if (!telefonoValido(telefono)) return res.status(400).json({ error: 'El teléfono no tiene un formato válido' });
+    if (!cedulaValida(cedula)) return res.status(400).json({ error: 'La cédula no tiene un formato válido' });
     await pool.query(
       'UPDATE clientes SET nombre=?, apellido=?, telefono=?, email=?, cedula=?, direccion=? WHERE id=?',
       [nombre, apellido, telefono, email || null, cedula || null, direccion || null, req.params.id]

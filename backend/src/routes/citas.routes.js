@@ -7,8 +7,10 @@ const { soloRoles } = require('../middleware/roles');
 const { notificarCambioEstado, notificarMecanico } = require('../utils/notificaciones');
 const { TRANSICIONES_CITA, transicionPermitida } = require('../utils/transiciones');
 const { sucursalValida, tecnicoEnSucursal } = require('../utils/sucursales');
+const { textoDentroDeLimite } = require('../utils/validar');
 
 const ESTADOS = ['agendado', 'en_revision', 'en_mantenimiento', 'listo', 'entregado', 'cancelado'];
+const MAX_MOTIVO = 1000;
 
 // Quién gestiona la agenda (crear/editar citas): mostrador y administración, NO el técnico.
 // El técnico solo mueve el estado de SUS citas (más abajo y en /api/mecanico).
@@ -53,9 +55,13 @@ router.get('/', async (req, res) => {
 
 router.post('/', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
   try {
-    const { cliente_id, moto_id, fecha, hora, motivo, tipo_servicio, tecnico_id } = req.body;
+    const { cliente_id, moto_id, fecha, hora, tipo_servicio, tecnico_id } = req.body;
+    const motivo = String(req.body.motivo || '').trim();
     if (!cliente_id || !fecha || !hora || !motivo) {
       return res.status(400).json({ error: 'cliente_id, fecha, hora y motivo son requeridos' });
+    }
+    if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
+      return res.status(400).json({ error: `motivo no puede exceder ${MAX_MOTIVO} caracteres` });
     }
     const sucursal_id = (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
     if (!(await tecnicoEnSucursal(tecnico_id, sucursal_id))) {
@@ -95,7 +101,11 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
   try {
-    const { cliente_id, moto_id, fecha, hora, motivo, tipo_servicio, tecnico_id } = req.body;
+    const { cliente_id, moto_id, fecha, hora, tipo_servicio, tecnico_id } = req.body;
+    const motivo = String(req.body.motivo || '').trim();
+    if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
+      return res.status(400).json({ error: `motivo no puede exceder ${MAX_MOTIVO} caracteres` });
+    }
     // Solo cambia la sucursal si llega una válida (no la borra al editar otros campos).
     const sucursalNueva = (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
     await pool.query(
