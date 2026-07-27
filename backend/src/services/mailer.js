@@ -3,6 +3,23 @@
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
 
+// Logo de la cabecera. En un correo no sirve incrustar la imagen (Gmail y compañía
+// descartan las data: URI), así que se enlaza desde el mismo dominio que sirve la app.
+// La base se deduce sola: en Railway sale de RAILWAY_PUBLIC_DOMAIN, y cuando tengamos
+// dominio propio basta con definir APP_URL. Sin base pública (desarrollo local) no se
+// pone <img> y la cabecera queda como antes, en texto.
+function baseUrlPublica() {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  return null;
+}
+
+function logoUrl() {
+  if (process.env.MAIL_LOGO_URL) return process.env.MAIL_LOGO_URL;
+  const base = baseUrlPublica();
+  return base ? `${base}/assets/logo/ms-logo-white.png` : null;
+}
+
 // ─────────────────────────────────────────────────────────────
 // Núcleo de envío. Todas las plantillas pasan por acá.
 // Devuelve true si el correo salió (o si estamos en modo dev sin API key);
@@ -56,11 +73,23 @@ async function enviarCorreo({ to, subject, html, devLog }) {
 
 // Envoltorio común: tarjeta oscura con encabezado del taller.
 function envoltorio(taller, titulo, cuerpoHtml) {
+  const nombre = escapar(taller || 'MS Motos');
+  const logo = logoUrl();
+
+  // El alt del logo lleva el nombre del taller con el mismo estilo que el rótulo de
+  // texto: si el cliente de correo bloquea imágenes (Outlook lo hace por defecto),
+  // la cabecera se sigue leyendo igual que antes en vez de quedar un hueco.
+  const cabecera = logo
+    ? `<img src="${logo}" width="72" height="72" alt="${nombre}"
+           style="display:block;border:0;outline:none;text-decoration:none;width:72px;height:72px;
+                  color:#e11d48;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">`
+    : `<div style="color:#e11d48;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">${nombre}</div>`;
+
   return `
   <div style="background:#0a0a0a;padding:32px 0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
     <div style="max-width:460px;margin:0 auto;background:#171717;border-radius:24px;overflow:hidden;border:1px solid #262626;">
-      <div style="padding:28px 32px 8px;">
-        <div style="color:#e11d48;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">${escapar(taller || 'MS Motos')}</div>
+      <div style="padding:24px 32px 8px;">
+        ${cabecera}
         <h1 style="color:#fafafa;font-size:22px;margin:14px 0 6px;">${escapar(titulo)}</h1>
       </div>
       <div style="padding:4px 32px 30px;">${cuerpoHtml}</div>
