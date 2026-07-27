@@ -21,3 +21,6 @@ Thumbs.db
 
 # Salida de graphify (grafo de conocimiento local, no versionar)
 graphify-out/
+
+# Respaldos de la base: contienen datos reales de clientes. NUNCA versionar.
+backend/backups/
