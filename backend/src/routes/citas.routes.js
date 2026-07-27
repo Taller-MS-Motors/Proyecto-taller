@@ -4,7 +4,7 @@ const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
-const { notificarCambioEstado, notificarMecanico } = require('../utils/notificaciones');
+const { notificarCambioEstado, notificarMecanico, notificarCitaAgendada } = require('../utils/notificaciones');
 const { TRANSICIONES_CITA, transicionPermitida } = require('../utils/transiciones');
 const { sucursalValida, tecnicoEnSucursal } = require('../utils/sucursales');
 const { textoDentroDeLimite } = require('../utils/validar');
@@ -75,6 +75,8 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
     if (tecnico_id) {
       await notificarMecanico(tecnico_id, `Nueva cita asignada: ${tipo_servicio || motivo} el ${fecha} a las ${hora}`, req.usuario.id);
     }
+    // El cliente también se entera: el taller le agendó una cita desde el mostrador.
+    await notificarCitaAgendada(result.insertId);
     res.status(201).json({ data: nueva, message: 'Cita creada' });
   } catch (err) {
     fail(res, err);

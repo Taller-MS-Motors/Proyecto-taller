@@ -104,6 +104,40 @@ async function notificarCortesia(clienteId) {
   }
 }
 
+// Avisa al cliente que el taller le agendó una cita desde el mostrador. Hasta ahora
+// al crear una cita solo se notificaba al mecánico asignado: el cliente no recibía
+// nada en su campana. (Cuando la agenda él mismo desde el portal no hace falta.)
+async function notificarCitaAgendada(citaId) {
+  try {
+    const config = await getConfig();
+    if (!config.notif_estado) return;
+    const [[cita]] = await pool.query(
+      `SELECT ci.cliente_id, DATE_FORMAT(ci.fecha, '%d/%m') AS fecha,
+              TIME_FORMAT(ci.hora, '%H:%i') AS hora, ci.tipo_servicio, ci.motivo,
+              cl.notif_avances, m.marca, m.modelo
+       FROM citas ci
+       LEFT JOIN clientes cl ON cl.id = ci.cliente_id
+       LEFT JOIN motos m ON m.id = ci.moto_id
+       WHERE ci.id = ?`,
+      [citaId]
+    );
+    if (!cita || !cita.cliente_id) return;
+    // Preferencia del cliente: si desactivó los avisos, no se le notifica.
+    if (cita.notif_avances === 0) return;
+    const moto = [cita.marca, cita.modelo].filter(Boolean).join(' ') || 'tu moto';
+    const servicio = cita.tipo_servicio || cita.motivo || 'tu servicio';
+    await crearNotificacion({
+      cliente_id: cita.cliente_id,
+      cita_id: citaId,
+      titulo: `Cita agendada: ${cita.fecha} a las ${cita.hora}`,
+      mensaje: `El taller te agendó una cita para ${servicio} (${moto}) el ${cita.fecha} a las ${cita.hora}.`,
+      tipo: 'agendado',
+    });
+  } catch (err) {
+    console.error('⚠️  No se pudo notificar la cita agendada:', err.message);
+  }
+}
+
 async function notificarMecanico(tecnicoId, mensaje, remitenteId) {
   try {
     if (!tecnicoId) return;
@@ -147,4 +181,4 @@ async function notificarPresupuestoListo(ordenId) {
   }
 }
 
-module.exports = { notificarCambioEstado, crearNotificacion, notificarMecanico, notificarPresupuestoListo, ESTADO_LEGIBLE };
+module.exports = { notificarCambioEstado, crearNotificacion, notificarMecanico, notificarPresupuestoListo, notificarCitaAgendada, ESTADO_LEGIBLE };
