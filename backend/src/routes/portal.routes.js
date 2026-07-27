@@ -4,7 +4,7 @@ const bcrypt = require('bcrypt');
 const { pool } = require('../db/pool');
 const { fail } = require('../utils/responder');
 const authCliente = require('../middleware/auth-cliente');
-const { emailValido } = require('../utils/validar');
+const { emailValido, fotoValida } = require('../utils/validar');
 const { consumir } = require('../utils/rate-limit');
 const { enviarCodigoReset } = require('../services/mailer');
 const { SERVICIOS } = require('../utils/servicios');
@@ -21,19 +21,9 @@ async function hoyCR() {
   return new Date(Date.now() + offset * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-// Valida una foto subida por el cliente (avatar o moto). Acepta:
-//   - null / '' / undefined  → el cliente quita la foto (se guarda NULL).
-//   - data URL de imagen base64 (jpeg/png/webp/gif) de hasta ~4 MB.
-// El cliente ya comprime antes de enviar; este tope solo evita abusos.
-const FOTO_MAX_LEN = 4 * 1024 * 1024; // ~4 MB de string base64
-function fotoValida(foto) {
-  if (foto === null || foto === undefined || foto === '') return true;
-  return (
-    typeof foto === 'string' &&
-    /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(foto) &&
-    foto.length <= FOTO_MAX_LEN
-  );
-}
+// fotoValida (validación de imagen: tipo + tope ~4MB) vive en utils/validar.js,
+// compartida por todo el backend. El cliente ya comprime antes de enviar; el tope
+// solo evita abusos.
 // Normaliza el valor recibido a lo que se guarda en la BD (string o NULL).
 function fotoParaGuardar(foto) {
   return foto && String(foto).length ? foto : null;

@@ -1,28 +1,43 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Capacitor } from '@capacitor/core';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Usuario, LoginResponse } from '../models/usuario.model';
+import { secureGet, secureSet, secureRemove } from '../shared/secure-store.util';
 
 const TOKEN_KEY = 'tallerms_token';
 const USUARIO_KEY = 'tallerms_usuario';
+const nativo = Capacitor.isNativePlatform();
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private apiUrl = environment.apiUrl;
-  private usuarioSubject = new BehaviorSubject<Usuario | null>(this.getUsuarioGuardado());
+  // En nativo el token vive en el Keychain/Keystore (ver secure-store.util); acá solo
+  // se cachea en memoria para lecturas síncronas (interceptor, guards). En web sigue
+  // siendo localStorage de punta a punta, igual que antes.
+  private tokenCache: string | null = nativo ? null : localStorage.getItem(TOKEN_KEY);
+  private usuarioSubject = new BehaviorSubject<Usuario | null>(nativo ? null : this.getUsuarioGuardadoWeb());
 
   usuario$ = this.usuarioSubject.asObservable();
 
   constructor(private http: HttpClient) {}
 
+  // Hidrata la sesión desde el Keychain/Keystore en plataforma nativa. Se llama desde
+  // un APP_INITIALIZER (app.module.ts) para que termine ANTES de que arranquen los
+  // guards de ruta; en web no hace nada (ya se hidrató en el constructor).
+  async init(): Promise<void> {
+    if (!nativo) return;
+    const [token, usuarioRaw] = await Promise.all([secureGet(TOKEN_KEY), secureGet(USUARIO_KEY)]);
+    this.tokenCache = token;
+    if (usuarioRaw) {
+      try { this.usuarioSubject.next(JSON.parse(usuarioRaw)); } catch { /* sesión corrupta: queda deslogueado */ }
+    }
+  }
+
   login(email: string, password: string): Observable<{ data: LoginResponse }> {
     return this.http.post<{ data: LoginResponse }>(`${this.apiUrl}/auth/login`, { email, password }).pipe(
-      tap(res => {
-        localStorage.setItem(TOKEN_KEY, res.data.token);
-        localStorage.setItem(USUARIO_KEY, JSON.stringify(res.data.usuario));
-        this.usuarioSubject.next(res.data.usuario);
-      })
+      tap(res => this.guardarSesion(res.data.token, res.data.usuario))
     );
   }
 
@@ -35,19 +50,27 @@ export class AuthService {
 
   // Guarda la sesión del personal (la usa el login unificado cuando tipo === 'staff').
   aplicarSesionStaff(token: string, usuario: Usuario) {
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(USUARIO_KEY, JSON.stringify(usuario));
+    this.guardarSesion(token, usuario);
+  }
+
+  private guardarSesion(token: string, usuario: Usuario) {
+    // La caché en memoria se actualiza YA (lecturas síncronas inmediatas); la
+    // escritura persistente es fire-and-forget y no bloquea el login.
+    this.tokenCache = token;
     this.usuarioSubject.next(usuario);
+    secureSet(TOKEN_KEY, token);
+    secureSet(USUARIO_KEY, JSON.stringify(usuario));
   }
 
   logout() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USUARIO_KEY);
+    this.tokenCache = null;
     this.usuarioSubject.next(null);
+    secureRemove(TOKEN_KEY);
+    secureRemove(USUARIO_KEY);
   }
 
   getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+    return this.tokenCache;
   }
 
   getUsuario(): Usuario | null {
@@ -74,7 +97,7 @@ export class AuthService {
     return !!usuario && roles.includes(usuario.rol);
   }
 
-  private getUsuarioGuardado(): Usuario | null {
+  private getUsuarioGuardadoWeb(): Usuario | null {
     try {
       const raw = localStorage.getItem(USUARIO_KEY);
       return raw ? JSON.parse(raw) : null;

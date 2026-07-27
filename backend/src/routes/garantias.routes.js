@@ -3,6 +3,7 @@ const { pool } = require('../db/pool');
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
+const { fotoValida } = require('../utils/validar');
 
 // Piso de rol: recepción o superior. Sin esto, cualquier token válido (incluido el
 // de un cliente del portal) podía leer/crear reclamos de garantía ajenos.
@@ -111,6 +112,7 @@ router.post('/:id/fotos', async (req, res) => {
   try {
     const { url, descripcion } = req.body;
     if (!url) return res.status(400).json({ error: 'Imagen requerida' });
+    if (!fotoValida(url)) return res.status(400).json({ error: 'Imagen inválida' });
     const [result] = await pool.query(
       'INSERT INTO garantia_fotos (garantia_id, url, descripcion) VALUES (?, ?, ?)',
       [req.params.id, url, descripcion || null]

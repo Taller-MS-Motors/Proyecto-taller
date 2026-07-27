@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { getConfig, clearCache } = require('../utils/configuracion');
 const { getSucursales, clearCache: clearSucursalesCache } = require('../utils/sucursales');
+const { fotoValida } = require('../utils/validar');
 
 // Panel del administrador: métricas ejecutivas. Solo admin.
 router.use(auth, requireRol('admin'));
@@ -480,9 +481,7 @@ router.put('/cuenta/password', async (req, res) => {
 router.put('/cuenta/foto', async (req, res) => {
   try {
     const { foto } = req.body;
-    if (foto && typeof foto === 'string' && !foto.startsWith('data:image/')) {
-      return res.status(400).json({ error: 'Imagen inválida' });
-    }
+    if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
     await pool.query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto || null, req.usuario.id]);
     res.json({ data: { foto: foto || null }, message: foto ? 'Foto actualizada' : 'Foto eliminada' });
   } catch (err) {

@@ -1,7 +1,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Capacitor } from '@capacitor/core';
 import { BehaviorSubject, Observable, of, tap, catchError, throwError } from 'rxjs';
 import { environment } from '../../environments/environment';
+import { secureGet, secureSet, secureRemove } from '../shared/secure-store.util';
 
 export interface ClientePortal {
   id: number;
@@ -13,11 +15,16 @@ export interface ClientePortal {
 
 const TOKEN_KEY = 'tallerms_portal_token';
 const CLIENTE_KEY = 'tallerms_portal_cliente';
+const nativo = Capacitor.isNativePlatform();
 
 @Injectable({ providedIn: 'root' })
 export class PortalService {
   private url = `${environment.apiUrl}/portal`;
-  private clienteSubject = new BehaviorSubject<ClientePortal | null>(this.getClienteGuardado());
+  // En nativo el token vive en el Keychain/Keystore (ver secure-store.util); acá solo
+  // se cachea en memoria para lecturas síncronas (interceptor, guards). En web sigue
+  // siendo localStorage de punta a punta, igual que antes.
+  private tokenCache: string | null = nativo ? null : localStorage.getItem(TOKEN_KEY);
+  private clienteSubject = new BehaviorSubject<ClientePortal | null>(nativo ? null : this.getClienteGuardado());
   cliente$ = this.clienteSubject.asObservable();
   // Contador de notificaciones no leídas (alimenta el badge de la campana).
   private noLeidasSubject = new BehaviorSubject<number>(0);
@@ -25,13 +32,21 @@ export class PortalService {
 
   constructor(private http: HttpClient) {}
 
+  // Hidrata la sesión desde el Keychain/Keystore en plataforma nativa. Se llama desde
+  // un APP_INITIALIZER (app.module.ts) para que termine ANTES de que arranquen los
+  // guards de ruta; en web no hace nada (ya se hidrató en el constructor).
+  async init(): Promise<void> {
+    if (!nativo) return;
+    const [token, clienteRaw] = await Promise.all([secureGet(TOKEN_KEY), secureGet(CLIENTE_KEY)]);
+    this.tokenCache = token;
+    if (clienteRaw) {
+      try { this.clienteSubject.next(JSON.parse(clienteRaw)); } catch { /* sesión corrupta: queda deslogueado */ }
+    }
+  }
+
   login(email: string, password: string): Observable<{ data: { token: string; cliente: ClientePortal } }> {
     return this.http.post<{ data: { token: string; cliente: ClientePortal } }>(`${this.url}/login`, { email, password }).pipe(
-      tap(res => {
-        localStorage.setItem(TOKEN_KEY, res.data.token);
-        localStorage.setItem(CLIENTE_KEY, JSON.stringify(res.data.cliente));
-        this.clienteSubject.next(res.data.cliente);
-      })
+      tap(res => this.guardarSesion(res.data.token, res.data.cliente))
     );
   }
 
@@ -59,21 +74,25 @@ export class PortalService {
   }
 
   private guardarSesion(token: string, cliente: ClientePortal) {
-    localStorage.setItem(TOKEN_KEY, token);
-    localStorage.setItem(CLIENTE_KEY, JSON.stringify(cliente));
+    // La caché en memoria se actualiza YA (lecturas síncronas inmediatas); la
+    // escritura persistente es fire-and-forget y no bloquea el login.
+    this.tokenCache = token;
     this.clienteSubject.next(cliente);
+    secureSet(TOKEN_KEY, token);
+    secureSet(CLIENTE_KEY, JSON.stringify(cliente));
   }
 
   logout() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(CLIENTE_KEY);
+    this.tokenCache = null;
+    secureRemove(TOKEN_KEY);
+    secureRemove(CLIENTE_KEY);
     // Limpia el cache offline para no mostrar datos de otra cuenta tras cerrar sesión.
     ['citas', 'resumen', 'motos'].forEach(n => localStorage.removeItem(`tallerms_cache_${n}`));
     this.clienteSubject.next(null);
     this.noLeidasSubject.next(0);
   }
 
-  getToken(): string | null { return localStorage.getItem(TOKEN_KEY); }
+  getToken(): string | null { return this.tokenCache; }
   getCliente(): ClientePortal | null { return this.clienteSubject.value; }
   isLoggedIn(): boolean { return !!this.getToken(); }
 

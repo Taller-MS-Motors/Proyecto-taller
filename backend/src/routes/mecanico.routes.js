@@ -7,6 +7,7 @@ const requireRol = require('../middleware/roles');
 const { notificarCambioEstado } = require('../utils/notificaciones');
 const { TRANSICIONES_CITA, transicionPermitida } = require('../utils/transiciones');
 const { LEIDO_POR_MI, VISTO_POR_OTRO, marcarLeidos } = require('../utils/mensajes');
+const { fotoValida } = require('../utils/validar');
 
 // Panel del mecánico: opera sobre SUS citas asignadas. Accesible a técnico o superior.
 router.use(auth, requireRol('tecnico'));
@@ -447,9 +448,7 @@ router.get('/alertas', async (req, res) => {
 router.put('/perfil/foto', async (req, res) => {
   try {
     const { foto } = req.body;
-    if (foto && typeof foto === 'string' && !foto.startsWith('data:image/')) {
-      return res.status(400).json({ error: 'Imagen inválida' });
-    }
+    if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
     await pool.query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto || null, req.usuario.id]);
     res.json({ data: { foto: foto || null }, message: foto ? 'Foto actualizada' : 'Foto eliminada' });
   } catch (err) {

@@ -5,6 +5,7 @@ const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
 const { LEIDO_POR_MI, VISTO_POR_OTRO, marcarLeidos } = require('../utils/mensajes');
+const { fotoValida } = require('../utils/validar');
 
 // Mensajería interna 1:1 entre TODO el personal (estilo WhatsApp).
 // A diferencia de los buzones por rol viejos (/api/mecanico/mensajes y
@@ -113,9 +114,7 @@ router.post('/conversacion/:usuarioId', async (req, res) => {
     const { mensaje, foto } = req.body;
     const texto = (mensaje || '').trim().slice(0, 500);
     if (!texto && !foto) return res.status(400).json({ error: 'El mensaje o una foto es requerido' });
-    if (foto && (typeof foto !== 'string' || !foto.startsWith('data:image/'))) {
-      return res.status(400).json({ error: 'Imagen inválida' });
-    }
+    if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
     // La sede del mensaje = la del destinatario (mismo criterio que el modelo viejo).
     const [r] = await pool.query(
       `INSERT INTO mensajes_internos (remitente_id, destino_id, destino_rol, mensaje, foto, tipo, sucursal_id)
@@ -170,9 +169,7 @@ router.post('/avisos', soloRoles('recepcion', 'admin'), async (req, res) => {
     const { mensaje, foto } = req.body;
     const texto = (mensaje || '').trim().slice(0, 500);
     if (!texto && !foto) return res.status(400).json({ error: 'El mensaje o una foto es requerido' });
-    if (foto && (typeof foto !== 'string' || !foto.startsWith('data:image/'))) {
-      return res.status(400).json({ error: 'Imagen inválida' });
-    }
+    if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
     const [r] = await pool.query(
       "INSERT INTO mensajes_internos (remitente_id, destino_rol, tipo, mensaje, foto) VALUES (?, 'tecnico', 'broadcast', ?, ?)",
       [req.usuario.id, texto, foto || null]

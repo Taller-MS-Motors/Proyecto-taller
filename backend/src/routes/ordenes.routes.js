@@ -7,6 +7,7 @@ const { generarNumeroOrden, sincronizarCitaDesdeOrden, cerrarOrden } = require('
 const { TRANSICIONES_ORDEN, transicionPermitida } = require('../utils/transiciones');
 const { sucursalValida } = require('../utils/sucursales');
 const { LEIDO_POR_MI, VISTO_POR_OTRO, marcarLeidos } = require('../utils/mensajes');
+const { fotoValida } = require('../utils/validar');
 
 // Piso de rol: recepción o superior (recepción crea órdenes, el técnico las trabaja).
 // Sin esto, cualquier token válido podía leer/alterar órdenes ajenas y sus costos.
@@ -389,6 +390,7 @@ router.post('/:id/fotos', async (req, res) => {
   try {
     const { url, tipo, descripcion } = req.body;
     if (!url) return res.status(400).json({ error: 'Imagen requerida' });
+    if (!fotoValida(url)) return res.status(400).json({ error: 'Imagen inválida' });
     const tiposValidos = ['ingreso', 'diagnostico', 'avance', 'entrega'];
     const tipoFinal = tiposValidos.includes(tipo) ? tipo : 'ingreso';
     const [result] = await pool.query(

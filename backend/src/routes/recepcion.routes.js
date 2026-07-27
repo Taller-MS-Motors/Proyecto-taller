@@ -4,12 +4,14 @@ const { pool } = require('../db/pool');
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
+const { soloRoles } = require('../middleware/roles');
 const { generarNumeroOrden, sincronizarCitaDesdeOrden, cerrarOrden, avanzarEstadoOrden, estadoTrasAprobacion } = require('../utils/ordenes');
 const { getConfig, horasDisponibles } = require('../utils/configuracion');
 const { SERVICIOS } = require('../utils/servicios');
 const { getSucursales, tecnicoEnSucursal } = require('../utils/sucursales');
 const { notificarMecanico } = require('../utils/notificaciones');
 const { LEIDO_POR_MI, VISTO_POR_OTRO, marcarLeidos } = require('../utils/mensajes');
+const { fotoValida } = require('../utils/validar');
 
 // Panel de recepción: intermediaria entre cliente y mecánico.
 // Accesible a recepción y superiores.
@@ -691,9 +693,7 @@ router.put('/perfil', async (req, res) => {
 router.put('/perfil/foto', async (req, res) => {
   try {
     const { foto } = req.body;
-    if (foto && typeof foto === 'string' && !foto.startsWith('data:image/')) {
-      return res.status(400).json({ error: 'Imagen inválida' });
-    }
+    if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
     await pool.query('UPDATE usuarios SET foto = ? WHERE id = ?', [foto || null, req.usuario.id]);
     res.json({ data: { foto: foto || null }, message: foto ? 'Foto actualizada' : 'Foto eliminada' });
   } catch (err) {
@@ -766,20 +766,24 @@ router.patch('/ordenes/:id/tecnico', async (req, res) => {
   }
 });
 
-// Marcar una cotización como aprobada por el cliente (atajo desde recepción)
-router.post('/cotizaciones/:id/aprobar', async (req, res) => {
+// Marcar una cotización como aprobada por el cliente (atajo desde recepción, p. ej.
+// cuando aprueba verbalmente en el mostrador). Solo recepción/admin: no es una acción
+// que un técnico deba poder forjar en nombre del cliente.
+router.post('/cotizaciones/:id/aprobar', soloRoles('recepcion', 'admin'), async (req, res) => {
   try {
     const [[orden]] = await pool.query('SELECT id, estado FROM ordenes_trabajo WHERE id = ?', [req.params.id]);
     if (!orden) return res.status(404).json({ error: 'Orden no encontrada' });
+    // Igual que el endpoint del portal: solo se puede "aprobar" una orden que
+    // efectivamente está esperando esa aprobación (evita marcar como aprobada, con
+    // fecha y todo, una orden ya entregada/cancelada o en cualquier otro estado).
+    if (orden.estado !== 'esperando_aprobacion') {
+      return res.status(400).json({ error: 'La orden no está esperando aprobación' });
+    }
     await pool.query(
       "UPDATE ordenes_trabajo SET aprobacion_cliente = 'aprobado', aprobado_por_cliente = 1, fecha_aprobacion = NOW() WHERE id = ?",
       [req.params.id]
     );
-    // Igual que en el portal: aprobada deja de "esperar aprobación" y pasa a trabajar
-    // (o a esperar repuestos si hay pendientes).
-    if (orden.estado === 'esperando_aprobacion') {
-      await avanzarEstadoOrden(req.params.id, await estadoTrasAprobacion(req.params.id));
-    }
+    await avanzarEstadoOrden(req.params.id, await estadoTrasAprobacion(req.params.id));
     res.json({ message: 'Cotización aprobada' });
   } catch (err) {
     fail(res, err);
@@ -952,6 +956,7 @@ router.post('/mensajes-internos', async (req, res) => {
     if (!destino_id || ((!mensaje || !mensaje.trim()) && !foto)) {
       return res.status(400).json({ error: 'Destinatario y mensaje (o foto) son requeridos' });
     }
+    if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
     // La sede del mensaje = la del mecánico destinatario (para el filtro por sucursal).
     const [r] = await pool.query(
       `INSERT INTO mensajes_internos (remitente_id, destino_id, mensaje, foto, orden_id, sucursal_id)
@@ -971,6 +976,7 @@ router.post('/mensajes-internos/broadcast', async (req, res) => {
     if ((!mensaje || !mensaje.trim()) && !foto) {
       return res.status(400).json({ error: 'El mensaje o una foto es requerido' });
     }
+    if (!fotoValida(foto)) return res.status(400).json({ error: 'Imagen inválida' });
     const [r] = await pool.query(
       "INSERT INTO mensajes_internos (remitente_id, destino_rol, tipo, mensaje, foto) VALUES (?, 'tecnico', 'broadcast', ?, ?)",
       [req.usuario.id, (mensaje || '').trim(), foto || null]
