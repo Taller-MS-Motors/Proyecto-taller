@@ -1,7 +1,11 @@
-:host { position: fixed; inset: 0; z-index: 2000; }
+// El host cubre la pantalla, pero NO debe interceptar clicks: al cerrar el tour
+// solo se quita `.ob` (*ngIf) y el host quedaba como una lámina invisible sobre
+// toda la página, tragándose cada click del portal. `pointer-events: none` lo evita;
+// el diálogo lo reactiva para sí mismo (conserva el modal y su fondo bloqueante).
+:host { position: fixed; inset: 0; z-index: 2000; pointer-events: none; }
 
 .ob {
-  position: fixed; inset: 0; z-index: 2000;
+  position: fixed; inset: 0; z-index: 2000; pointer-events: auto;
   display: flex; align-items: center; justify-content: center; padding: 24px;
   background: rgba(0, 0, 0, 0.55);
   animation: obFade .2s ease;

@@ -4,11 +4,17 @@ const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
-const { notificarCambioEstado, notificarMecanico } = require('../utils/notificaciones');
+const { notificarCambioEstado, notificarMecanico, notificarCitaAgendada } = require('../utils/notificaciones');
 const { TRANSICIONES_CITA, transicionPermitida } = require('../utils/transiciones');
 const { sucursalValida, tecnicoEnSucursal } = require('../utils/sucursales');
+const { textoDentroDeLimite } = require('../utils/validar');
 
 const ESTADOS = ['agendado', 'en_revision', 'en_mantenimiento', 'listo', 'entregado', 'cancelado'];
+const MAX_MOTIVO = 1000;
+
+// Tope del listado (ver comentario en clientes.routes.js): los filtros por fecha,
+// estado, técnico, sucursal y búsqueda son server-side.
+const MAX_LISTADO = 500;
 
 // Quién gestiona la agenda (crear/editar citas): mostrador y administración, NO el técnico.
 // El técnico solo mueve el estado de SUS citas (más abajo y en /api/mecanico).
@@ -43,7 +49,7 @@ router.get('/', async (req, res) => {
       const like = `%${q}%`;
       params.push(like, like, like, like);
     }
-    sql += ' ORDER BY ci.fecha ASC, ci.hora ASC';
+    sql += ` ORDER BY ci.fecha ASC, ci.hora ASC LIMIT ${MAX_LISTADO}`;
     const [rows] = await pool.query(sql, params);
     res.json({ data: rows });
   } catch (err) {
@@ -53,9 +59,13 @@ router.get('/', async (req, res) => {
 
 router.post('/', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
   try {
-    const { cliente_id, moto_id, fecha, hora, motivo, tipo_servicio, tecnico_id } = req.body;
+    const { cliente_id, moto_id, fecha, hora, tipo_servicio, tecnico_id } = req.body;
+    const motivo = String(req.body.motivo || '').trim();
     if (!cliente_id || !fecha || !hora || !motivo) {
       return res.status(400).json({ error: 'cliente_id, fecha, hora y motivo son requeridos' });
+    }
+    if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
+      return res.status(400).json({ error: `motivo no puede exceder ${MAX_MOTIVO} caracteres` });
     }
     const sucursal_id = (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
     if (!(await tecnicoEnSucursal(tecnico_id, sucursal_id))) {
@@ -69,6 +79,8 @@ router.post('/', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
     if (tecnico_id) {
       await notificarMecanico(tecnico_id, `Nueva cita asignada: ${tipo_servicio || motivo} el ${fecha} a las ${hora}`, req.usuario.id);
     }
+    // El cliente también se entera: el taller le agendó una cita desde el mostrador.
+    await notificarCitaAgendada(result.insertId);
     res.status(201).json({ data: nueva, message: 'Cita creada' });
   } catch (err) {
     fail(res, err);
@@ -95,15 +107,28 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', soloRoles(...GESTIONA_AGENDA), async (req, res) => {
   try {
-    const { cliente_id, moto_id, fecha, hora, motivo, tipo_servicio, tecnico_id } = req.body;
+    const { cliente_id, moto_id, fecha, hora, tipo_servicio, tecnico_id } = req.body;
+    const motivo = String(req.body.motivo || '').trim();
+    if (!textoDentroDeLimite(motivo, MAX_MOTIVO)) {
+      return res.status(400).json({ error: `motivo no puede exceder ${MAX_MOTIVO} caracteres` });
+    }
     // Solo cambia la sucursal si llega una válida (no la borra al editar otros campos).
     const sucursalNueva = (await sucursalValida(req.body.sucursal_id)) ? Number(req.body.sucursal_id) : null;
+    // Fecha/hora previas: si el taller mueve la cita hay que avisarle al cliente
+    // (antes se le cambiaba el día y no se enteraba por ningún lado).
+    const [[previa]] = await pool.query(
+      "SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, TIME_FORMAT(hora, '%H:%i') AS hora FROM citas WHERE id = ?",
+      [req.params.id]
+    );
     await pool.query(
       `UPDATE citas SET cliente_id=?, moto_id=?, tecnico_id=?, fecha=?, hora=?, motivo=?, tipo_servicio=?,
          sucursal_id = COALESCE(?, sucursal_id) WHERE id=?`,
       [cliente_id, moto_id || null, tecnico_id || null, fecha, hora, motivo, tipo_servicio || null, sucursalNueva, req.params.id]
     );
     const [[actualizada]] = await pool.query('SELECT * FROM citas WHERE id = ?', [req.params.id]);
+    // Solo si de verdad cambió el momento de la cita (editar el motivo no molesta al cliente).
+    const movida = previa && (previa.fecha !== String(fecha).slice(0, 10) || previa.hora !== String(hora).slice(0, 5));
+    if (movida) await notificarCitaAgendada(req.params.id, { reprogramada: true });
     res.json({ data: actualizada, message: 'Cita actualizada' });
   } catch (err) {
     fail(res, err);

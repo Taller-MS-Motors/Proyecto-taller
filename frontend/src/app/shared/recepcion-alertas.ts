@@ -8,6 +8,7 @@ export function alertaIcono(a: any): string {
     case 'lista': return 'checkmark-done-outline';
     case 'aprobacion': return a.decision === 'rechazado' ? 'close-circle-outline' : 'thumbs-up-outline';
     case 'cita_nueva': return 'calendar-outline';
+    case 'cita_cancelada': return 'calendar-clear-outline';
     case 'repuesto': return 'cube-outline';
     default: return 'notifications-outline';
   }
@@ -19,6 +20,7 @@ export function alertaColor(a: any): string {
     case 'lista': return 'green';
     case 'aprobacion': return a.decision === 'rechazado' ? 'amber' : 'green';
     case 'cita_nueva': return 'indigo';
+    case 'cita_cancelada': return 'rose';
     case 'repuesto': return 'amber';
     default: return 'amber';
   }
@@ -36,6 +38,8 @@ export function alertaTexto(a: any): string {
       return `${cliente} ${a.decision === 'rechazado' ? 'rechazó' : 'aprobó'} el presupuesto`;
     case 'cita_nueva':
       return `Cita nueva: ${cliente} — ${a.fecha_corta || ''} ${a.hora || ''}`.trim();
+    case 'cita_cancelada':
+      return `Cita cancelada por ${cliente || 'el cliente'} — ${a.fecha_corta || ''} ${a.hora || ''}`.trim();
     case 'repuesto':
       return `${a.tecnico_nombre || 'Mecánico'} solicita: ${a.repuesto_nombre} ×${a.repuesto_cantidad || 1} · ${moto}`;
     default:

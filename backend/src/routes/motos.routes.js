@@ -2,8 +2,13 @@ const router = require('express').Router();
 const { pool } = require('../db/pool');
 const { fail } = require('../utils/responder');
 const auth = require('../middleware/auth');
+const { anioValido, placaValida } = require('../utils/validar');
 
 router.use(auth);
+
+// Tope del listado global (ver comentario en clientes.routes.js): la búsqueda por `q`
+// y el filtro por cliente_id son server-side, así que no hace falta traer todo.
+const MAX_LISTADO = 500;
 
 router.get('/', async (req, res) => {
   try {
@@ -24,7 +29,7 @@ router.get('/', async (req, res) => {
       const like = `%${q}%`;
       params.push(like, like, like);
     }
-    sql += ' ORDER BY m.created_at DESC';
+    sql += ` ORDER BY m.created_at DESC LIMIT ${MAX_LISTADO}`;
     const [rows] = await pool.query(sql, params);
     res.json({ data: rows });
   } catch (err) {
@@ -38,6 +43,8 @@ router.post('/', async (req, res) => {
     if (!cliente_id || !marca || !modelo) {
       return res.status(400).json({ error: 'cliente_id, marca y modelo son requeridos' });
     }
+    if (!placaValida(placa)) return res.status(400).json({ error: 'La placa no tiene un formato válido' });
+    if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
     // Evita placas duplicadas (normaliza espacios y guiones), igual que en el portal.
     if (placa) {
       const [[dup]] = await pool.query(
@@ -76,6 +83,8 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { marca, modelo, anio, placa, color, numero_motor, numero_chasis, kilometraje_actual, foto_url } = req.body;
+    if (!placaValida(placa)) return res.status(400).json({ error: 'La placa no tiene un formato válido' });
+    if (!anioValido(anio)) return res.status(400).json({ error: 'El año no es válido' });
     await pool.query(
       `UPDATE motos SET marca=?, modelo=?, anio=?, placa=?, color=?, numero_motor=?, numero_chasis=?, kilometraje_actual=?, foto_url=?
        WHERE id=?`,

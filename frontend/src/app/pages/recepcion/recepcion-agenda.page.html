@@ -82,6 +82,7 @@
                 <span class="pill" [ngClass]="estadoPill[c.estado]">{{ estadoLabel[c.estado] || c.estado }}</span>
                 <span class="badge llego" *ngIf="llego(c)"><ion-icon name="checkmark-circle"></ion-icon> Llegó</span>
                 <span class="badge sin" *ngIf="sinConfirmar(c)"><ion-icon name="alert-circle"></ion-icon> Sin confirmar</span>
+                <span class="badge noshow" *ngIf="noShow(c)"><ion-icon name="close-circle"></ion-icon> No se presentó</span>
               </div>
             </div>
             <button class="ci-wa" (click)="$event.stopPropagation(); whatsapp(c)" aria-label="WhatsApp">

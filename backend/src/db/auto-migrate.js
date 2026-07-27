@@ -166,6 +166,10 @@ async function ensureSchema() {
     // no_show: el job diario marca las citas vencidas nunca atendidas (no las cancela ni borra).
     await addColumnIfMissing('citas', 'recordatorio_enviado', 'TINYINT(1) NOT NULL DEFAULT 0');
     await addColumnIfMissing('citas', 'no_show', 'TINYINT(1) NOT NULL DEFAULT 0');
+    // Cancelación hecha por el cliente desde el portal: sin esto el taller no se
+    // enteraba (la cita simplemente desaparecía de la agenda). Alimenta la alerta
+    // 'cita_cancelada' de recepción.
+    await addColumnIfMissing('citas', 'fecha_cancelacion', 'DATETIME NULL');
 
     // Nuevos estados de la cita (flujo que ve el cliente en el portal).
     // Idempotente: solo migra si el enum todavía tiene los estados viejos.
@@ -442,6 +446,10 @@ async function ensureSchema() {
     // de usuarios y bandejas por destinatario sin escanear la tabla.
     await crearIndiceSiFalta('mensajes_internos', 'idx_msg_par', '(remitente_id, destino_id, created_at)');
     await crearIndiceSiFalta('mensajes_internos', 'idx_msg_destino_created', '(destino_id, created_at)');
+
+    // El listado de clientes filtra por activo y ordena por nombre/apellido: sin este
+    // índice MySQL escanea la tabla entera y hace filesort en cada carga del módulo.
+    await crearIndiceSiFalta('clientes', 'idx_clientes_activo_nombre', '(activo, nombre, apellido)');
 
     // FK constraints en columnas agregadas por addColumnIfMissing (integridad referencial).
     await tryStep('fk citas.tecnico_id', () => addFkIfMissing('citas', 'fk_citas_tecnico', 'tecnico_id', 'usuarios', 'id'));

@@ -71,7 +71,7 @@ router.get('/citas-hoy', async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT ci.id, ci.fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora, ci.motivo, ci.tipo_servicio, ci.estado, ci.monto,
-              ci.confirmada_cliente, ci.hora_llegada, ci.orden_id, o.numero_orden,
+              ci.confirmada_cliente, ci.hora_llegada, ci.no_show, ci.orden_id, o.numero_orden,
               c.id AS cliente_id, c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono,
               m.marca, m.modelo, m.placa,
               t.nombre AS tecnico_nombre,
@@ -101,7 +101,7 @@ router.get('/agenda', async (req, res) => {
     const [rows] = await pool.query(
       `SELECT ci.id, DATE_FORMAT(ci.fecha,'%Y-%m-%d') AS fecha, TIME_FORMAT(ci.hora,'%H:%i') AS hora,
               ci.motivo, ci.tipo_servicio, ci.estado, ci.confirmada_cliente, ci.hora_llegada,
-              ci.orden_id, o.numero_orden,
+              ci.no_show, ci.orden_id, o.numero_orden,
               c.id AS cliente_id, c.nombre AS cliente_nombre, c.apellido AS cliente_apellido, c.telefono AS cliente_telefono,
               m.marca, m.modelo, m.placa,
               t.nombre AS tecnico_nombre,
@@ -268,6 +268,21 @@ router.get('/alertas', async (req, res) => {
          AND ci.created_at >= NOW() - INTERVAL 24 HOUR
        ORDER BY ci.created_at DESC LIMIT 10`
     );
+    // Citas que el cliente canceló desde el portal: el taller tiene que enterarse
+    // para liberar/reasignar el espacio (antes la cita solo desaparecía de la agenda).
+    const [citasCanceladas] = await pool.query(
+      `SELECT 'cita_cancelada' AS tipo, ci.fecha_cancelacion AS created_at,
+              ci.id AS cita_id, DATE_FORMAT(ci.fecha, '%d/%m') AS fecha_corta,
+              TIME_FORMAT(ci.hora, '%H:%i') AS hora,
+              c.nombre AS cliente_nombre, c.apellido AS cliente_apellido,
+              m.marca, m.modelo
+       FROM citas ci
+       JOIN clientes c ON c.id = ci.cliente_id
+       LEFT JOIN motos m ON m.id = ci.moto_id
+       WHERE ci.estado = 'cancelado' AND ci.fecha_cancelacion IS NOT NULL
+         AND ci.fecha_cancelacion >= NOW() - INTERVAL 24 HOUR
+       ORDER BY ci.fecha_cancelacion DESC LIMIT 10`
+    );
     const [repSolicitados] = await pool.query(
       `SELECT 'repuesto' AS tipo, r.created_at,
               o.numero_orden, o.id AS orden_id,
@@ -282,7 +297,7 @@ router.get('/alertas', async (req, res) => {
          AND r.created_at >= NOW() - INTERVAL 24 HOUR
        ORDER BY r.created_at DESC LIMIT 10`
     );
-    const todas = [...fotos, ...listas, ...aprob, ...citasNuevas, ...repSolicitados]
+    const todas = [...fotos, ...listas, ...aprob, ...citasNuevas, ...citasCanceladas, ...repSolicitados]
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0, 20);
     res.json({ data: todas });
