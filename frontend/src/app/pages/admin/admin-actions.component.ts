@@ -7,7 +7,13 @@ import { Subject, filter, takeUntil } from 'rxjs';
   selector: 'app-admin-actions',
   template: `
     <span class="adm-date">{{ fecha }}</span>
-    <ion-button *ngIf="mostrarNuevaCita" class="adm-nueva" size="small" [routerLink]="['/cita-form']">+ Nueva cita</ion-button>
+    <!-- En pantallas angostas el texto se oculta por CSS y queda solo el "+",
+         para no comerle el espacio al título. El aria-label mantiene el sentido. -->
+    <ion-button *ngIf="mostrarNuevaCita" class="adm-nueva" size="small" [routerLink]="['/cita-form']"
+                title="Nueva cita" aria-label="Nueva cita">
+      <ion-icon name="add" aria-hidden="true"></ion-icon>
+      <span class="adm-nueva-txt">Nueva cita</span>
+    </ion-button>
   `,
 })
 export class AdminActionsComponent implements OnDestroy {

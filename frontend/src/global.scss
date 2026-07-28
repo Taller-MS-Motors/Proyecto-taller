@@ -634,9 +634,22 @@ ion-toast {
   .adm-date { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: #A3A3A3;
     background: #1A1A1A; border: 1px solid #2A2A2A; border-radius: 999px; padding: 5px 12px; white-space: nowrap; }
   .adm-nueva { --background: var(--ion-color-primary); --background-hover: var(--ion-color-primary-shade); --background-activated: var(--ion-color-primary-shade); --color: #fff;
-    --border-radius: 9px; --box-shadow: none; font-weight: 700; text-transform: none; font-size: 12px; letter-spacing: 0; margin: 0; }
+    --border-radius: 9px; --box-shadow: none; font-weight: 700; text-transform: none; font-size: 12px; letter-spacing: 0; margin: 0;
+    flex-shrink: 0;
+    ion-icon { font-size: 15px; }
+    .adm-nueva-txt { margin-left: 5px; white-space: nowrap; }
+  }
+  // El título necesita poder recortarse: si no, empuja al botón fuera de la barra.
+  ion-title { min-width: 0; }
 }
 @media (max-width: 640px) { .admin-topbar .adm-date { display: none; } }
+// Debajo de 560px el título largo ("Gestión de Citas y Órdenes") y el botón no
+// conviven: se deja el botón como un "+" compacto y el título recupera el ancho.
+@media (max-width: 560px) {
+  .admin-topbar .adm-nueva .adm-nueva-txt { display: none; }
+  .admin-topbar .adm-nueva { --padding-start: 7px; --padding-end: 7px; }
+  .admin-topbar .adm-nueva ion-icon { font-size: 18px; }
+}
 .admin-sidebar { --width: 240px; --background: #111111; --border-color: #2A2A2A; }
 ion-footer.admin-dark { background: #111111; }
 
