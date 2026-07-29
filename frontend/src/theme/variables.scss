@@ -78,6 +78,10 @@
   --ion-item-background: #ffffff;
   --ion-toolbar-background: #ffffff;
   --ion-toolbar-color: #0a0a0a;
+  // Fondo de los overlays (alert, popover, loading). Sin esto Ionic usa su propio
+  // gris casi blanco: en modo oscuro el texto (--ion-text-color) quedaba blanco
+  // sobre fondo blanco y los diálogos eran ilegibles, sobre todo en iOS.
+  --ion-overlay-background-color: #ffffff;
   --ion-tab-bar-background: #ffffff;
   --ion-tab-bar-color: #a3a3a3;
   --ion-tab-bar-color-selected: #e11d48;
@@ -146,6 +150,8 @@
     --ion-item-background: #171717;
     --ion-toolbar-background: #0f0f0f;
     --ion-toolbar-color: #fafafa;
+    // Overlays oscuros: acompañan al texto claro (ver nota en el :root de arriba).
+    --ion-overlay-background-color: #171717;
     --ion-tab-bar-background: #0f0f0f;
     --ion-tab-bar-color: #737373;
     --ion-tab-bar-color-selected: #f43f5e;
