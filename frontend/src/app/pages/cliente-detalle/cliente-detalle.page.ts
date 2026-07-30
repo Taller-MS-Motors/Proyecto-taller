@@ -118,6 +118,31 @@ export class ClienteDetallePage implements OnInit, OnDestroy {
     await conf.present();
   }
 
+  // Saca al cliente del sistema. Sus órdenes y facturación se conservan (van
+  // ligadas por columnas NOT NULL), pero se borran sus datos personales y accesos.
+  async eliminarCliente() {
+    const conf = await this.alert.create({
+      header: 'Eliminar cliente',
+      message: `¿Eliminar a ${this.cliente!.nombre} ${this.cliente!.apellido || ''}? Se borran sus datos personales, su acceso al portal y sus motos salen de los listados. Las órdenes y facturas ya registradas se conservan. No se puede deshacer.`,
+      buttons: [
+        { text: 'Cancelar', role: 'cancel' },
+        {
+          text: 'Eliminar', role: 'destructive',
+          handler: () => {
+            this.clienteSvc.eliminar(this.cliente!.id!).pipe(takeUntil(this.destroy$)).subscribe({
+              next: () => {
+                this.mostrarToast('Cliente eliminado');
+                this.router.navigate(['/clientes'], { replaceUrl: true });
+              },
+              error: (e) => this.mostrarToast(e.error?.error || 'No se pudo eliminar'),
+            });
+          },
+        },
+      ],
+    });
+    await conf.present();
+  }
+
   // Abre WhatsApp con las credenciales y el link del portal para enviárselas al cliente
   async compartirCredenciales(password: string) {
     const url = `${location.origin}/portal/login`;

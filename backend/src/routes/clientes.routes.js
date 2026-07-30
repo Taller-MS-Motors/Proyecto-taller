@@ -177,4 +177,54 @@ router.get('/:id/ordenes', async (req, res) => {
   }
 });
 
+// DELETE /:id — saca al cliente del sistema conservando el historial del taller.
+//
+// TODAS las columnas cliente_id que lo referencian son NOT NULL (motos, citas,
+// ordenes_trabajo, notificaciones, recompensas_canjeadas), así que no se puede
+// borrar la fila sin arrastrar las órdenes y su facturación. Entonces:
+//   • se borran sus datos personales y sus accesos (queda anonimizado),
+//   • se desactiva (activo = 0), y como todos los listados filtran activo = 1
+//     el cliente desaparece de la app,
+//   • las órdenes ya cobradas quedan intactas para la contabilidad.
+router.delete('/:id', async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const id = Number(req.params.id);
+    const [[cliente]] = await conn.query('SELECT id FROM clientes WHERE id = ? AND activo = 1', [id]);
+    if (!cliente) {
+      conn.release();
+      return res.status(404).json({ error: 'Cliente no encontrado' });
+    }
+
+    await conn.beginTransaction();
+
+    // Rastro personal y accesos al portal: se borran de verdad.
+    await conn.query('DELETE FROM notificaciones WHERE cliente_id = ?', [id]);
+    await conn.query('DELETE FROM password_reset_codes WHERE cliente_id = ?', [id]);
+    await conn.query('DELETE FROM login_codes WHERE cliente_id = ?', [id]);
+    await conn.query('DELETE FROM email_verify_codes WHERE cliente_id = ?', [id]);
+
+    // Sus motos salen de los listados activos, pero siguen ligadas a las órdenes.
+    await conn.query('UPDATE motos SET activa = 0 WHERE cliente_id = ?', [id]);
+
+    // nombre/apellido/telefono son NOT NULL: se reemplazan por un marcador.
+    await conn.query(
+      `UPDATE clientes SET
+         nombre = 'Cliente', apellido = 'eliminado', telefono = '-',
+         email = NULL, cedula = NULL, direccion = NULL, foto = NULL,
+         password_hash = NULL, email_pendiente = NULL, activo = 0
+       WHERE id = ?`,
+      [id]
+    );
+
+    await conn.commit();
+    res.json({ message: 'Cliente eliminado' });
+  } catch (err) {
+    await conn.rollback().catch(() => {});
+    fail(res, err);
+  } finally {
+    conn.release();
+  }
+});
+
 module.exports = router;

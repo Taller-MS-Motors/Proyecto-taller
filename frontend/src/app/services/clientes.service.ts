@@ -44,4 +44,10 @@ export class ClientesService {
   canjearCortesia(id: number): Observable<{ message: string }> {
     return this.http.patch<{ message: string }>(`${this.url}/${id}/cortesia`, {});
   }
+
+  // Saca al cliente del sistema. El backend conserva sus órdenes y facturación
+  // (no se pueden desvincular) pero borra sus datos personales y accesos.
+  eliminar(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${this.url}/${id}`);
+  }
 }
