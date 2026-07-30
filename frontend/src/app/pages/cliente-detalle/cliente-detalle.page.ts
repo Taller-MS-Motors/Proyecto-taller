@@ -4,6 +4,7 @@ import { AlertController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { ClientesService } from '../../services/clientes.service';
+import { AuthService } from '../../services/auth.service';
 import { Cliente } from '../../models/cliente.model';
 import { Moto } from '../../models/moto.model';
 import { Orden } from '../../models/orden.model';
@@ -25,9 +26,16 @@ export class ClienteDetallePage implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     private clienteSvc: ClientesService,
+    private auth: AuthService,
     private alert: AlertController,
     private toast: ToastController
   ) {}
+
+  // La lista de clientes vive en dos lugares según el rol: recepción tiene la suya
+  // y el resto del personal la ve dentro de las pestañas. No existe un /clientes suelto.
+  private rutaListaClientes(): string {
+    return this.auth.getUsuario()?.rol === 'recepcion' ? '/recepcion/clientes' : '/tabs/clientes';
+  }
 
   ngOnInit() {
     const id = +(this.route.snapshot.paramMap.get('id') || 0);
@@ -132,7 +140,9 @@ export class ClienteDetallePage implements OnInit, OnDestroy {
             this.clienteSvc.eliminar(this.cliente!.id!).pipe(takeUntil(this.destroy$)).subscribe({
               next: () => {
                 this.mostrarToast('Cliente eliminado');
-                this.router.navigate(['/clientes'], { replaceUrl: true });
+                // replaceUrl: el detalle sale del historial, así el botón "atrás"
+                // no vuelve a la ficha de un cliente que ya no existe.
+                this.router.navigate([this.rutaListaClientes()], { replaceUrl: true });
               },
               error: (e) => this.mostrarToast(e.error?.error || 'No se pudo eliminar'),
             });
