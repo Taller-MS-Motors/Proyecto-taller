@@ -12,11 +12,21 @@ const rateLimit = require('express-rate-limit');
 const WORKERS = Math.max(1, Number(process.env.WEB_CONCURRENCY) || 1);
 const porProceso = (total) => Math.max(1, Math.floor(total / WORKERS));
 
+// Cupos configurables. Existen para las pruebas de carga: con los valores normales,
+// una prueba desde una sola IP choca contra el limitador antes de acercarse al límite
+// real del sistema, y terminaría midiendo el limitador en vez de la aplicación.
+// Se exponen como número (no como un interruptor de "apagado") a propósito: un valor
+// alto por error sigue siendo un límite, un `off` olvidado no protege nada.
+const cupo = (env, pordefecto) => {
+  const n = Number(process.env[env]);
+  return Number.isFinite(n) && n > 0 ? n : pordefecto;
+};
+
 // General: toda la API. Generoso para no afectar el uso normal del SPA, pero
 // frena un cliente que dispare miles de requests y sature la base.
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,        // 1 minuto
-  max: porProceso(600),       // 600 req/min por IP en total (~10/seg)
+  max: porProceso(cupo('RATE_API_MAX', 600)),       // 600 req/min por IP en total (~10/seg)
   standardHeaders: true,      // expone RateLimit-* headers
   legacyHeaders: false,
   message: { error: 'Demasiadas solicitudes. Esperá un momento e intentá de nuevo.' },
@@ -26,7 +36,7 @@ const apiLimiter = rateLimit({
 // fuerza bruta y cada intento corre bcrypt (caro en CPU).
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,   // 15 minutos
-  max: porProceso(30),        // 30 intentos por IP en la ventana, en total
+  max: porProceso(cupo('RATE_AUTH_MAX', 30)),        // 30 intentos por IP en la ventana, en total
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiados intentos. Esperá unos minutos e intentá de nuevo.' },
@@ -34,7 +44,7 @@ const authLimiter = rateLimit({
 
 const adminLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: porProceso(120),
+  max: porProceso(cupo('RATE_ADMIN_MAX', 120)),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiadas solicitudes al panel admin. Esperá un momento.' },

@@ -36,3 +36,25 @@ test('acepta un status personalizado', () => {
     assert.equal(res._status, 503);
   });
 });
+
+// Errores de MySQL que describen un dato inválido del cliente, no una falla del
+// servidor. Devolverlos como 500 hacía que un formulario mal llenado se viera igual
+// que una caída real, tanto para el cliente como en el monitoreo.
+test('los errores de dato inválido salen como 400, no 500', () => {
+  for (const code of ['ER_NO_REFERENCED_ROW_2', 'ER_DUP_ENTRY', 'ER_DATA_TOO_LONG', 'ER_BAD_NULL_ERROR']) {
+    const res = fakeRes();
+    const origWarn = console.warn; console.warn = () => {};
+    try { fail(res, { code, message: 'x', sqlMessage: 'x' }); } finally { console.warn = origWarn; }
+    assert.equal(res._status, 400, `${code} debería ser 400`);
+    assert.ok(res._body.error && res._body.error !== 'Error interno del servidor',
+      `${code} debería explicar qué pasó`);
+  }
+});
+
+test('un error inesperado sigue siendo 500 y no filtra el detalle', () => {
+  const res = fakeRes();
+  const origError = console.error; console.error = () => {};
+  try { fail(res, new Error('SELECT secreto FROM interna')); } finally { console.error = origError; }
+  assert.equal(res._status, 500);
+  assert.equal(res._body.error, 'Error interno del servidor');
+});

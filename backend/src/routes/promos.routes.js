@@ -6,11 +6,33 @@ const requireRol = require('../middleware/roles');
 
 router.use(auth);
 
+// Columnas del listado. La imagen queda FUERA a propósito: se guarda como data URL
+// en base64 dentro de la tabla, así que devolverla en la lista hacía que la respuesta
+// pesara ~100 KB por promoción (3 MB con 30 activas, medido en la prueba de carga).
+// Se expone `tiene_imagen` y la imagen se pide aparte, por promoción, como ya hacía
+// el portal del cliente. Además así el navegador puede cachearla.
+const COLS_LISTA = `id, titulo, descripcion, descuento, precio_final, activa, created_at,
+                    (imagen IS NOT NULL) AS tiene_imagen`;
+
 // GET /api/promos — todas (para gestión del personal)
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM promos ORDER BY created_at DESC');
+    const [rows] = await pool.query(`SELECT ${COLS_LISTA} FROM promos ORDER BY created_at DESC`);
     res.json({ data: rows });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// GET /api/promos/:id/imagen — la imagen de una promoción, aparte del listado.
+// Devuelve la data URL en JSON, el mismo contrato que ya usa el portal del cliente:
+// la ruta pide sesión, y un <img src> no puede mandar la cabecera de autorización,
+// así que el frontend la trae por HttpClient y la asigna cuando llega.
+router.get('/:id/imagen', async (req, res) => {
+  try {
+    const [[p]] = await pool.query('SELECT imagen FROM promos WHERE id = ?', [req.params.id]);
+    if (!p || !p.imagen) return res.status(404).json({ error: 'Sin imagen' });
+    res.json({ data: p.imagen });
   } catch (err) {
     fail(res, err);
   }

@@ -18,6 +18,9 @@ export class AdminPromosPage implements OnInit, OnDestroy {
   editId: number | null = null;
   modalAbierto = false;
   busqueda = '';
+  // Imagenes cargadas a demanda: el listado ya no las trae (pesaba ~100 KB por
+  // promocion, 3 MB con 30 activas). Se piden solo las que se van a ver.
+  imagenes: Record<number, string> = {};
   form: { titulo: string; descripcion: string; descuento: number | null; precio_final: number | null; imagen: string | null; activa: boolean } =
     { titulo: '', descripcion: '', descuento: null, precio_final: null, imagen: null, activa: true };
 
@@ -46,6 +49,14 @@ export class AdminPromosPage implements OnInit, OnDestroy {
   abrirModal() { this.cancelar(); this.modalAbierto = true; }
   cerrarModal() { this.modalAbierto = false; this.cancelar(); }
   quitarImagen() { this.form.imagen = null; }
+
+  // Si falla, simplemente no se pinta: la tarjeta cae al icono de siempre.
+  cargarImagen(p: Promo) {
+    this.svc.getImagen(p.id!).pipe(takeUntil(this.destroy$)).subscribe({
+      next: r => { if (r.data) this.imagenes[p.id!] = r.data; },
+      error: () => {},
+    });
+  }
 
   onFile(ev: any) {
     const file = ev.target?.files?.[0];
@@ -81,7 +92,7 @@ export class AdminPromosPage implements OnInit, OnDestroy {
     this.form = {
       titulo: p.titulo, descripcion: p.descripcion,
       descuento: p.descuento ?? null, precio_final: p.precio_final ?? null,
-      imagen: p.imagen || null, activa: !!p.activa,
+      imagen: this.imagenes[p.id!] || p.imagen || null, activa: !!p.activa,
     };
     this.modalAbierto = true;
   }

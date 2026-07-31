@@ -40,8 +40,8 @@
 
     <div class="promo-grid" *ngIf="!cargando && filtradas.length">
       <div class="promo-card" *ngFor="let p of filtradas" [class.inactiva]="!p.activa">
-        <img *ngIf="p.imagen" [src]="p.imagen" alt="" class="promo-img">
-        <div class="promo-img-ph" *ngIf="!p.imagen"><ion-icon name="gift-outline"></ion-icon></div>
+        <img *ngIf="imagenes[p.id!]" [src]="imagenes[p.id!]" alt="" class="promo-img">
+        <div class="promo-img-ph" *ngIf="!imagenes[p.id!]"><ion-icon name="gift-outline"></ion-icon></div>
         <div class="promo-body">
           <div class="promo-head">
             <h4>{{ p.titulo }}</h4>

@@ -10,6 +10,8 @@ export interface Promo {
   descuento?: number;
   precio_final?: number | null;
   imagen?: string | null;
+  // El listado ya no trae la imagen (pesaba ~100 KB por promo): solo si la hay.
+  tiene_imagen?: number;
   activa?: number;
   created_at?: string;
 }
@@ -18,6 +20,12 @@ export interface Promo {
 export class PromosService {
   private url = `${environment.apiUrl}/promos`;
   constructor(private http: HttpClient) {}
+
+  // La imagen se pide por separado: la ruta exige sesion y un <img src> no puede
+  // mandar la cabecera de autorizacion, asi que viaja como data URL en JSON.
+  getImagen(id: number): Observable<{ data: string }> {
+    return this.http.get<{ data: string }>(`${this.url}/${id}/imagen`);
+  }
 
   getAll(): Observable<{ data: Promo[] }> {
     return this.http.get<{ data: Promo[] }>(this.url);
