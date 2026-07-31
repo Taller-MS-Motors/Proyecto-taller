@@ -95,6 +95,37 @@
           <button class="btn btn-cr config-btn-full" [disabled]="guardando" (click)="guardarConfig()">Guardar capacidad</button>
         </div>
 
+        <!-- Entrega: lo que trae precargado el cierre de una orden -->
+        <div class="cd mb">
+          <span class="cd-title"><ion-icon name="shield-checkmark-outline"></ion-icon> Entrega y cobro</span>
+
+          <div class="fg">
+            <label>Días de garantía por defecto</label>
+            <input type="number" min="0" max="730" [(ngModel)]="config.garantia_dias">
+            <div class="hint">Con esto llega precargado el cierre de cada orden. Se puede cambiar en una entrega puntual sin tocar este valor.</div>
+          </div>
+
+          <div class="fg">
+            <label>Formas de pago</label>
+            <div class="hint config-pago-nota">
+              Son las opciones del cierre de orden. Quitar una no afecta a las órdenes ya
+              cobradas con ella: conservan su forma de pago.
+            </div>
+            <div class="config-pago-row" *ngFor="let m of config.metodos_pago; let i = index">
+              <input type="text" maxlength="40" [(ngModel)]="m.etiqueta" placeholder="Ej: Crédito del taller">
+              <button type="button" class="config-pago-x" (click)="quitarMetodoPago(i)"
+                      [disabled]="config.metodos_pago.length <= 1" title="Quitar">
+                <ion-icon name="close"></ion-icon>
+              </button>
+            </div>
+            <button type="button" class="btn btn-sm config-pago-add" (click)="agregarMetodoPago()">
+              <ion-icon name="add"></ion-icon> Agregar forma de pago
+            </button>
+          </div>
+
+          <button class="btn btn-cr config-btn-full" [disabled]="guardando" (click)="guardarConfig()">Guardar entrega y cobro</button>
+        </div>
+
         <!-- Notificaciones -->
         <div class="cd mb">
           <span class="cd-title"><ion-icon name="notifications-outline"></ion-icon> Notificaciones</span>

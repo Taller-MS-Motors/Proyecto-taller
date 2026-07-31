@@ -11,8 +11,16 @@ export function escapeHtml(v: any): string {
 // `titulo` se escapa acá como red de seguridad. `contenido` es HTML por diseño
 // (tablas, barras): cada valor dinámico que arme el llamador debe venir ya escapado
 // con escapeHtml() — no se puede escapar el bloque entero sin romper el maquetado.
-export async function generarPDF(titulo: string, contenido: string, logoUrl = 'assets/logo/ms-iso.png') {
+// `logoUrl` acepta tanto una ruta del bundle como una data URL (que es como se guarda
+// el logo cargado desde la configuración): fetch() resuelve las dos.
+export async function generarPDF(
+  titulo: string,
+  contenido: string,
+  logoUrl = 'assets/logo/ms-iso.png',
+  nombreTaller = 'MS Motos',
+) {
   titulo = escapeHtml(titulo);
+  nombreTaller = escapeHtml(nombreTaller);
   let logoBase64 = '';
   try {
     const resp = await fetch(logoUrl);
@@ -67,13 +75,13 @@ export async function generarPDF(titulo: string, contenido: string, logoUrl = 'a
 <body>
   <div class="header">
     <div>
-      <span class="logo">${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : ''}MS Motos</span>
+      <span class="logo">${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : ''}${nombreTaller}</span>
       <h1>${titulo}</h1>
     </div>
     <div class="fecha">${new Date().toLocaleDateString('es-CR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
   </div>
   ${contenido}
-  <div class="footer">Generado automáticamente por MS Motos · ${new Date().toLocaleString('es-CR')}</div>
+  <div class="footer">Generado automáticamente por ${nombreTaller} · ${new Date().toLocaleString('es-CR')}</div>
   <script>window.onload = function() { window.print(); }</script>
 </body>
 </html>`);

@@ -559,11 +559,32 @@ router.put('/configuracion', async (req, res) => {
           }))
       : null;
 
+    // Formas de pago. `valor` es lo que queda escrito en ordenes_trabajo.metodo_pago,
+    // así que se normaliza a un identificador estable (sin espacios ni acentos) y, si
+    // el nombre viene vacío, la fila se descarta en vez de guardar una opción muda.
+    const metodos = Array.isArray(b.metodos_pago)
+      ? b.metodos_pago
+          .map((m) => ({
+            valor: String(m?.valor || m?.etiqueta || '').trim().toLowerCase()
+              .normalize('NFD').replace(/[̀-ͯ]/g, '')   // saca los acentos
+              .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+              .slice(0, 30),
+            etiqueta: String(m?.etiqueta || '').trim().slice(0, 40),
+          }))
+          .filter((m) => m.valor && m.etiqueta)
+      : null;
+    // Una sola variable decide, para que la columna del UPDATE y el parámetro no puedan
+    // desalinearse. Si quedó vacío tras normalizar, no se guarda: mejor conservar las
+    // formas de pago anteriores que dejar el cierre de orden sin ninguna opción.
+    const metodosJson = metodos && metodos.length ? JSON.stringify(metodos) : null;
+
     await pool.query(
       `UPDATE configuracion SET
          nombre_taller = ?, telefono = ?, email = ?, direccion = ?, logo = ?,
          max_citas_hora = ?, dias_anticipacion = ?, duracion_cita_min = ?, cancelacion_horas_min = ?,
+         garantia_dias = ?,
          ${horarios ? 'horarios = ?,' : ''}
+         ${metodosJson ? 'metodos_pago = ?,' : ''}
          notif_estado = ?, notif_recordatorio = ?, notif_cotizacion = ?, notif_email_entrega = ?
        WHERE id = 1`,
       [
@@ -576,7 +597,9 @@ router.put('/configuracion', async (req, res) => {
         num(b.dias_anticipacion, 30),
         num(b.duracion_cita_min, 90),
         numNoNeg(b.cancelacion_horas_min, 2),
+        numNoNeg(b.garantia_dias, 30),
         ...(horarios ? [JSON.stringify(horarios)] : []),
+        ...(metodosJson ? [metodosJson] : []),
         bit(b.notif_estado),
         bit(b.notif_recordatorio),
         bit(b.notif_cotizacion),

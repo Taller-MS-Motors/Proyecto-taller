@@ -276,3 +276,37 @@
     font-size: 14px;
   }
 }
+
+// Formas de pago: filas editables con su botón de quitar.
+.config-pago-nota { margin-bottom: 10px; }
+
+.config-pago-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+
+  input { flex: 1; min-width: 0; }
+
+  .config-pago-x {
+    flex-shrink: 0;
+    background: none;
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+    color: var(--tx3);
+    cursor: pointer;
+    padding: 8px;
+    line-height: 0;
+    &:hover:not(:disabled) { color: var(--rd); border-color: var(--rd); }
+    &:disabled { opacity: .4; cursor: default; }
+    ion-icon { font-size: 16px; }
+  }
+}
+
+.config-pago-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  ion-icon { font-size: 15px; }
+}

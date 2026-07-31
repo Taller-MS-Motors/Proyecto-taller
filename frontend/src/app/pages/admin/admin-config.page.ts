@@ -3,6 +3,7 @@ import { ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { AdminService } from '../../services/admin.service';
+import { MarcaService } from '../../services/marca.service';
 
 interface HorarioVista { dia: number; label: string; abre: string; cierra: string; activo: boolean; }
 
@@ -32,6 +33,7 @@ export class AdminConfigPage implements OnInit, OnDestroy {
 
   constructor(
     private admin: AdminService, private toast: ToastController,
+    private marcaSvc: MarcaService,
   ) {}
 
   ngOnInit() {
@@ -42,7 +44,7 @@ export class AdminConfigPage implements OnInit, OnDestroy {
   cargar() {
     this.cargando = true;
     this.admin.getConfig().pipe(takeUntil(this.destroy$)).subscribe({
-      next: r => { this.config = r.data; this.normalizarHorarios(); this.cargando = false; },
+      next: r => { this.config = r.data; this.normalizarHorarios(); this.normalizarMetodos(); this.cargando = false; },
       error: () => { this.cargando = false; this.aviso('No se pudo cargar la configuración', 'danger'); },
     });
   }
@@ -115,9 +117,37 @@ export class AdminConfigPage implements OnInit, OnDestroy {
       horarios: this.horariosVista.map(h => ({ dia: h.dia, abre: h.abre, cierra: h.cierra, activo: h.activo ? 1 : 0 })),
     };
     this.admin.updateConfig(payload).pipe(takeUntil(this.destroy$)).subscribe({
-      next: r => { this.config = r.data; this.normalizarHorarios(); this.guardando = false; this.aviso('Configuración guardada'); },
+      next: r => {
+        this.config = r.data;
+        this.normalizarHorarios();
+        this.normalizarMetodos();
+        // El logo y el nombre viajan a la factura y al PDF por MarcaService, que cachea:
+        // sin esto habria que recargar la app para ver el cambio.
+        this.marcaSvc.invalidar();
+        this.guardando = false;
+        this.aviso('Configuración guardada');
+      },
       error: (e) => { this.guardando = false; this.aviso(e.error?.error || 'No se pudo guardar', 'danger'); },
     });
+  }
+
+  // Siempre al menos una forma de pago: sin ninguna, el cierre de orden se queda sin
+  // opciones y no se puede entregar nada.
+  private normalizarMetodos() {
+    if (!Array.isArray(this.config?.metodos_pago) || !this.config.metodos_pago.length) {
+      this.config.metodos_pago = [{ valor: 'efectivo', etiqueta: 'Efectivo' }];
+    }
+  }
+
+  agregarMetodoPago() {
+    this.config.metodos_pago = [...(this.config.metodos_pago || []), { valor: '', etiqueta: '' }];
+  }
+
+  // El identificador interno de los existentes NO se toca: es lo que quedó escrito en
+  // las órdenes ya cobradas. Para los nuevos lo deriva el backend de la etiqueta.
+  quitarMetodoPago(i: number) {
+    if (this.config.metodos_pago.length <= 1) return;
+    this.config.metodos_pago = this.config.metodos_pago.filter((_: any, x: number) => x !== i);
   }
 
   ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }

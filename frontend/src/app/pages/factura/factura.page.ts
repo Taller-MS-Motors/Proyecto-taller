@@ -5,6 +5,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { OrdenesService } from '../../services/ordenes.service';
 import { Orden, OrdenRepuesto } from '../../models/orden.model';
+import { MarcaService, Marca } from '../../services/marca.service';
 
 @Component({
   standalone: false,
@@ -17,14 +18,19 @@ export class FacturaPage implements OnInit, OnDestroy {
   orden: Orden | null = null;
   repuestos: OrdenRepuesto[] = [];
   cargando = true;
+  // Identidad del taller: el logo y el nombre salen de la configuracion, no del
+  // archivo que viene con la app. Sin esto, subir un logo nuevo no cambiaba la factura.
+  marca: Marca | null = null;
 
   constructor(
     private route: ActivatedRoute,
     private location: Location,
-    private ordenSvc: OrdenesService
+    private ordenSvc: OrdenesService,
+    private marcaSvc: MarcaService
   ) {}
 
   ngOnInit() {
+    this.marcaSvc.get().pipe(takeUntil(this.destroy$)).subscribe(m => this.marca = m);
     const id = +(this.route.snapshot.paramMap.get('id') || 0);
     this.ordenSvc.getById(id).pipe(takeUntil(this.destroy$)).subscribe(res => { this.orden = res.data; this.cargando = false; });
     this.ordenSvc.getRepuestos(id).pipe(takeUntil(this.destroy$)).subscribe(res => this.repuestos = res.data);
@@ -43,4 +49,7 @@ export class FacturaPage implements OnInit, OnDestroy {
 
   imprimir() { window.print(); }
   volver() { this.location.back(); }
+
+  get logo(): string { return this.marcaSvc.logoParaDocumento(this.marca); }
+  get nombreTaller(): string { return this.marca?.nombre_taller || 'MS Motos'; }
 }

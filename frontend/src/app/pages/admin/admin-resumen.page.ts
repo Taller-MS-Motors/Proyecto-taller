@@ -9,6 +9,7 @@ import { OrdenesService } from '../../services/ordenes.service';
 import { ESTADO_CONFIG, EstadoOrden } from '../../models/orden.model';
 import { descargarCSV, fechaCorta } from '../../shared/csv.util';
 import { generarPDF, formatMoneda, formatPct, escapeHtml } from '../../shared/pdf.util';
+import { MarcaService } from '../../services/marca.service';
 
 type Sem = 'rojo' | 'amarillo' | 'verde' | 'gris';
 
@@ -54,6 +55,7 @@ export class AdminResumenPage implements OnInit, OnDestroy {
     private ordenes: OrdenesService,
     private toast: ToastController,
     private router: Router,
+    private marcaSvc: MarcaService,
   ) {}
 
   ngOnInit() { this.cargar(); }
@@ -260,8 +262,12 @@ export class AdminResumenPage implements OnInit, OnDestroy {
         </div>
       </div>` : '';
 
-    generarPDF('Resumen Ejecutivo', kpis + operativo + estadoCitas + topServicios + ingresosPorServicio + tecnicosHTML)
-      .then(() => this.aviso('PDF generado'));
+    // Logo y nombre del taller configurados, no los del archivo que trae la app.
+    const contenido = kpis + operativo + estadoCitas + topServicios + ingresosPorServicio + tecnicosHTML;
+    this.marcaSvc.get().pipe(takeUntil(this.destroy$)).subscribe(m => {
+      generarPDF('Resumen Ejecutivo', contenido, this.marcaSvc.logoParaDocumento(m), m.nombre_taller)
+        .then(() => this.aviso('PDF generado'));
+    });
   }
 
   private async aviso(message: string, color = 'success') {

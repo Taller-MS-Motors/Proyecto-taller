@@ -382,6 +382,10 @@ async function ensureSchema() {
     await addColumnIfMissing('configuracion', 'cancelacion_horas_min', 'INT DEFAULT 2');
     await addColumnIfMissing('configuracion', 'visitas_para_cortesia', 'INT DEFAULT 7');
     await addColumnIfMissing('configuracion', 'zona_horaria_offset', 'INT DEFAULT -6');
+    // Garantía por defecto al entregar (antes fija en 30 dentro del frontend).
+    await addColumnIfMissing('configuracion', 'garantia_dias', 'INT DEFAULT 30');
+    // Formas de pago del cierre de orden. JSON [{valor, etiqueta}]; NULL = las de fábrica.
+    await addColumnIfMissing('configuracion', 'metodos_pago', 'JSON NULL');
     // Siembra la fila única con valores por defecto (idempotente: INSERT IGNORE).
     // Horarios: 0=Dom … 6=Sáb. L-V 08-17, Sáb 08-13, Dom cerrado.
     await tryStep('seed configuracion', () =>

@@ -26,6 +26,18 @@ const DEFAULTS = {
     { dia: 5, abre: '08:00', cierra: '17:00', activo: 1 },
     { dia: 6, abre: '08:00', cierra: '13:00', activo: 1 },
   ],
+  // Garantía que se ofrece al entregar. Antes estaba fija en 30 en el frontend y se
+  // escribía a mano en cada cierre; acá es el valor con el que llega precargado.
+  garantia_dias: 30,
+  // Formas de pago que ofrece el cierre de orden. `valor` es lo que se guarda en
+  // ordenes_trabajo.metodo_pago, así que NO se cambia para los que ya existen: si se
+  // renombrara, las órdenes viejas quedarían con un método que ya no figura.
+  metodos_pago: [
+    { valor: 'efectivo', etiqueta: 'Efectivo' },
+    { valor: 'sinpe', etiqueta: 'SINPE Móvil' },
+    { valor: 'tarjeta', etiqueta: 'Tarjeta' },
+    { valor: 'transferencia', etiqueta: 'Transferencia' },
+  ],
   notif_estado: 1,
   notif_recordatorio: 1,
   notif_cotizacion: 1,
@@ -49,15 +61,20 @@ async function getConfig() {
   } catch (_) {
     // Tabla aún no migrada / sin fila: se usan los DEFAULTS.
   }
-  // horarios puede venir parseado (mysql2 → array), como string JSON, o null.
-  let horarios = row.horarios;
-  if (typeof horarios === 'string') {
-    try { horarios = JSON.parse(horarios); } catch { horarios = null; }
-  }
+  // Las columnas JSON pueden venir parseadas (mysql2 → array), como string, o null.
+  const listaJson = (valor, porDefecto) => {
+    let v = valor;
+    if (typeof v === 'string') {
+      try { v = JSON.parse(v); } catch { v = null; }
+    }
+    return Array.isArray(v) && v.length ? v : porDefecto;
+  };
+
   const config = {
     ...DEFAULTS,
     ...row,
-    horarios: Array.isArray(horarios) && horarios.length ? horarios : DEFAULTS.horarios,
+    horarios: listaJson(row.horarios, DEFAULTS.horarios),
+    metodos_pago: listaJson(row.metodos_pago, DEFAULTS.metodos_pago),
   };
   cache = config;
   cacheAt = Date.now();

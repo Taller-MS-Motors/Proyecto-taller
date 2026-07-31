@@ -122,7 +122,10 @@ test('la cabecera usa el logo solo si hay dominio publico', async () => {
     process.env.APP_URL = 'https://ejemplo.test/';
     await enviarCodigoLogin('a@b.com', 'Ana', '111111');
     assert.ok(ultimo.html.includes('<img'), 'con dominio publico debe llevar el logo');
-    assert.ok(ultimo.html.includes('https://ejemplo.test/assets/logo/'), 'sin barra doble en la URL');
+    // Apunta al endpoint, no al archivo del bundle: sirve el logo configurado por el
+    // taller (guardado como data URL, inservible dentro de un correo) y si no hay,
+    // redirige al que trae la app.
+    assert.ok(ultimo.html.includes('https://ejemplo.test/api/marca/logo'), 'usa el endpoint de marca, sin barra doble');
   } finally {
     global.fetch = fetchOriginal;
     console.warn = origWarn;

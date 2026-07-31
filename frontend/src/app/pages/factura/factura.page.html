@@ -21,7 +21,7 @@
     <!-- Encabezado -->
     <div class="fac-header">
       <div class="fac-marca">
-        <img src="assets/logo/ms-logo.png" alt="MS Motos" style="height:64px;width:auto" />
+        <img [src]="logo" [alt]="nombreTaller" style="height:64px;width:auto" />
         <p>Motos · Repuestos · Taller</p>
         <p class="fac-suc" *ngIf="orden.sucursal_nombre">
           <strong>Sucursal {{ orden.sucursal_nombre }}</strong>

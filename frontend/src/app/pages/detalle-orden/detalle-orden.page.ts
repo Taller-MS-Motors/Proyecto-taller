@@ -5,6 +5,7 @@ import { OrdenesService } from '../../services/ordenes.service';
 import { UsuariosService } from '../../services/usuarios.service';
 import { RecepcionService } from '../../services/recepcion.service';
 import { GarantiasService } from '../../services/garantias.service';
+import { MarcaService } from '../../services/marca.service';
 import { AuthService } from '../../services/auth.service';
 import { MecanicoService } from '../../services/mecanico.service';
 import { Orden, OrdenAvance, OrdenRepuesto, OrdenChecklist, OrdenFoto, EstadoOrden, ESTADO_CONFIG } from '../../models/orden.model';
@@ -86,7 +87,10 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
     observaciones: '',
   };
 
+  // La garantia y las formas de pago salen de la configuracion del taller; estos
+  // valores solo cubren el instante previo a que llegue la respuesta.
   cierre = { metodo_pago: 'efectivo', garantia_dias: 30, observaciones_finales: '' };
+  metodosPago: { valor: string; etiqueta: string }[] = [];
 
   readonly estadosSiguientes: Record<EstadoOrden, EstadoOrden[]> = {
     recepcion:            ['diagnostico', 'cancelada'],
@@ -118,6 +122,7 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
     private usuarioSvc: UsuariosService,
     private rec: RecepcionService,
     private garantiaSvc: GarantiasService,
+    private marcaSvc: MarcaService,
     public auth: AuthService,
     private mecSvc: MecanicoService,
     private alert: AlertController,
@@ -127,6 +132,17 @@ export class DetalleOrdenPage implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
+    // Precarga la garantía y las formas de pago que definió el taller. Antes la
+    // garantía estaba fija en 30 acá y había que reescribirla en cada entrega.
+    this.marcaSvc.get().pipe(takeUntil(this.destroy$)).subscribe(m => {
+      this.metodosPago = m.metodos_pago;
+      this.cierre.garantia_dias = m.garantia_dias;
+      // Si la forma de pago por defecto ya no está en la lista configurada, se toma
+      // la primera: es preferible a dejar el campo apuntando a una opción inexistente.
+      if (!this.metodosPago.some(x => x.valor === this.cierre.metodo_pago)) {
+        this.cierre.metodo_pago = this.metodosPago[0]?.valor || '';
+      }
+    });
     const id = this.route.snapshot.paramMap.get('id');
     if (id) this.cargar(+id);
   }

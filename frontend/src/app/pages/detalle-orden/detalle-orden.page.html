@@ -343,10 +343,7 @@
       </div>
       <ion-item>
         <ion-select label="Método de pago" labelPlacement="floating" [(ngModel)]="cierre.metodo_pago" interface="action-sheet">
-          <ion-select-option value="efectivo">Efectivo</ion-select-option>
-          <ion-select-option value="sinpe">SINPE Móvil</ion-select-option>
-          <ion-select-option value="tarjeta">Tarjeta</ion-select-option>
-          <ion-select-option value="transferencia">Transferencia</ion-select-option>
+          <ion-select-option *ngFor="let m of metodosPago" [value]="m.valor">{{ m.etiqueta }}</ion-select-option>
         </ion-select>
       </ion-item>
       <ion-item>

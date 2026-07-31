@@ -14,10 +14,13 @@ function baseUrlPublica() {
   return null;
 }
 
+// Se apunta a /api/marca/logo y no al archivo del bundle: ese endpoint devuelve el
+// logo cargado desde la configuración (guardado como data URL, que en un correo no
+// se puede usar) y, si no hay ninguno, redirige al que trae la app.
 function logoUrl() {
   if (process.env.MAIL_LOGO_URL) return process.env.MAIL_LOGO_URL;
   const base = baseUrlPublica();
-  return base ? `${base}/assets/logo/ms-logo-white.png` : null;
+  return base ? `${base}/api/marca/logo` : null;
 }
 
 // ─────────────────────────────────────────────────────────────
