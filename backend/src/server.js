@@ -157,13 +157,20 @@ if (hasFrontend) {
 }
 
 const PORT = process.env.PORT || 3000;
+
+// Bajo cluster.js el primario ya migró y decide qué worker corre los jobs; en arranque
+// suelto (`node src/server.js`) no hay nadie más, así que este proceso hace las dos cosas.
+const bajoCluster = process.env.MIGRADO === '1';
+const correrJobs = bajoCluster ? process.env.JOBS === '1' : true;
+
 // Corre la auto-migración ANTES de aceptar requests, así no hay una ventana
 // donde la base esté a medio migrar mientras el server ya responde.
 (async () => {
   await testConnection();
-  await ensureSchema();
+  if (!bajoCluster) await ensureSchema();
   // Tareas de fondo (recordatorios de cita, no-show). Después de migrar, para que
   // las columnas que usan (recordatorio_enviado, no_show) ya existan.
-  iniciarJobs();
-  app.listen(PORT, () => console.log(`🚀 Servidor en http://localhost:${PORT}`));
+  // Solo un proceso las programa: si no, cada cliente recibiría un correo por worker.
+  if (correrJobs) iniciarJobs();
+  app.listen(PORT, () => console.log(`🚀 Servidor en http://localhost:${PORT}${bajoCluster ? ` (worker ${process.pid}${correrJobs ? ', con jobs' : ''})` : ''}`));
 })();

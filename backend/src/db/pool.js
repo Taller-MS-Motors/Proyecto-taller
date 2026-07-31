@@ -3,11 +3,19 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+// Presupuesto TOTAL de conexiones, repartido entre los workers. Cada proceso abre su
+// propio pool, así que sin dividir, 4 workers × 10 abrirían 40 y el número real se
+// escaparía sin que nadie lo note (MySQL corta en max_connections y las peticiones
+// empiezan a fallar con un error que no dice nada de esto).
+const TOTAL_CONEXIONES = Number(process.env.DB_POOL_TOTAL) || 40;
+const WORKERS = Math.max(1, Number(process.env.WEB_CONCURRENCY) || 1);
+const POR_PROCESO = Math.max(4, Math.floor(TOTAL_CONEXIONES / WORKERS));
+
 function buildConfig() {
   // Railway inyecta MYSQL_URL con el formato:
   // mysql://user:password@host:port/database
   if (process.env.MYSQL_URL) {
-    return { uri: process.env.MYSQL_URL, waitForConnections: true, connectionLimit: 10 };
+    return { uri: process.env.MYSQL_URL, waitForConnections: true, connectionLimit: POR_PROCESO };
   }
   return {
     host: process.env.DB_HOST || 'localhost',
@@ -16,7 +24,7 @@ function buildConfig() {
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'proyecto_taller',
     waitForConnections: true,
-    connectionLimit: 10,
+    connectionLimit: POR_PROCESO,
   };
 }
 
