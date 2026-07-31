@@ -1,0 +1,55 @@
+// ────────────────────────────────────────────────
+// Admin Promociones — component-scoped styles
+// La grilla y las tarjetas (.promo-grid / .promo-card) son globales; el buscador y
+// la cáscara del modal también (.adm-buscador / .adm-modal). Acá solo lo propio.
+// ────────────────────────────────────────────────
+
+.promo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+
+  .cd-title { margin: 0; }
+}
+
+.nueva-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  ion-icon { font-size: 15px; }
+}
+
+.promo-tools {
+  margin-bottom: 12px;
+}
+
+.promo-progress {
+  font-size: 12px;
+  color: var(--tx2);
+  margin-bottom: 14px;
+}
+
+.promo-quitar-img {
+  margin-top: 8px;
+}
+
+// Casilla de "mostrar en el portal": el label completo es el área de clic.
+.promo-activar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: var(--tx);
+
+  input { width: 16px; height: 16px; margin: 0; accent-color: var(--cr); cursor: pointer; }
+}
+
+.empty-accion {
+  margin-top: 10px;
+}

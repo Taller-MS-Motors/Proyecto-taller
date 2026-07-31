@@ -32,49 +32,6 @@
   margin-bottom: 12px;
 }
 
-.buscador {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 1 1 220px;
-
-  .bs-lupa {
-    position: absolute;
-    left: 10px;
-    font-size: 15px;
-    color: var(--tx3);
-    pointer-events: none;
-  }
-
-  input {
-    width: 100%;
-    padding: 8px 30px 8px 32px;
-    border: 1px solid var(--bd);
-    border-radius: 8px;
-    background: var(--sur2);
-    color: var(--tx);
-    font-size: 12px;
-    font-family: inherit;
-    outline: none;
-    transition: border-color .15s;
-
-    &:focus { border-color: var(--cr); }
-    &::placeholder { color: var(--tx3); }
-  }
-
-  .bs-x {
-    position: absolute;
-    right: 6px;
-    background: none;
-    border: none;
-    padding: 2px;
-    line-height: 0;
-    color: var(--tx3);
-    cursor: pointer;
-    &:hover { color: var(--tx); }
-    ion-icon { font-size: 15px; }
-  }
-}
 
 .tareas-filter {
   padding: 7px 10px;

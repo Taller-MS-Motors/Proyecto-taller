@@ -8,6 +8,7 @@ import { PromosService, Promo } from '../../services/promos.service';
   standalone: false,
   selector: 'app-admin-promos',
   templateUrl: './admin-promos.page.html',
+  styleUrls: ['./admin-promos.page.scss'],
 })
 export class AdminPromosPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
@@ -15,6 +16,8 @@ export class AdminPromosPage implements OnInit, OnDestroy {
   cargando = true;
   guardando = false;
   editId: number | null = null;
+  modalAbierto = false;
+  busqueda = '';
   form: { titulo: string; descripcion: string; descuento: number | null; precio_final: number | null; imagen: string | null; activa: boolean } =
     { titulo: '', descripcion: '', descuento: null, precio_final: null, imagen: null, activa: true };
 
@@ -23,13 +26,26 @@ export class AdminPromosPage implements OnInit, OnDestroy {
   ngOnInit() { this.cargar(); }
   ionViewWillEnter() { this.cargar(); }
 
-  cargar() {
+  cargar(ev?: any) {
     this.cargando = true;
     this.svc.getAll().pipe(takeUntil(this.destroy$)).subscribe({
-      next: r => { this.promos = r.data; this.cargando = false; },
-      error: () => { this.cargando = false; },
+      next: r => { this.promos = r.data; this.cargando = false; if (ev) ev.target.complete(); },
+      error: () => { this.cargando = false; if (ev) ev.target.complete(); },
     });
   }
+
+  get filtradas(): Promo[] {
+    const q = this.busqueda.trim().toLowerCase();
+    if (!q) return this.promos;
+    return this.promos.filter(p =>
+      (p.titulo || '').toLowerCase().includes(q) || (p.descripcion || '').toLowerCase().includes(q));
+  }
+  get activas(): number { return this.promos.filter(p => p.activa).length; }
+  get filtrando(): boolean { return !!this.busqueda.trim(); }
+
+  abrirModal() { this.cancelar(); this.modalAbierto = true; }
+  cerrarModal() { this.modalAbierto = false; this.cancelar(); }
+  quitarImagen() { this.form.imagen = null; }
 
   onFile(ev: any) {
     const file = ev.target?.files?.[0];
@@ -55,7 +71,7 @@ export class AdminPromosPage implements OnInit, OnDestroy {
     };
     const op = editando ? this.svc.update(this.editId!, payload) : this.svc.create(payload);
     op.pipe(takeUntil(this.destroy$)).subscribe({
-      next: () => { this.guardando = false; this.cancelar(); this.cargar(); this.aviso(editando ? 'Promoción actualizada' : 'Promoción creada'); },
+      next: () => { this.guardando = false; this.cerrarModal(); this.cargar(); this.aviso(editando ? 'Promoción actualizada' : 'Promoción creada'); },
       error: (err) => { this.guardando = false; this.aviso(err.error?.error || 'No se pudo guardar', 'danger'); },
     });
   }
@@ -67,6 +83,7 @@ export class AdminPromosPage implements OnInit, OnDestroy {
       descuento: p.descuento ?? null, precio_final: p.precio_final ?? null,
       imagen: p.imagen || null, activa: !!p.activa,
     };
+    this.modalAbierto = true;
   }
 
   cancelar() {

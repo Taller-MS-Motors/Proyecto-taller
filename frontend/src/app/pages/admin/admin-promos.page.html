@@ -7,12 +7,86 @@
 </ion-header>
 
 <ion-content class="admin-dark">
+  <ion-refresher slot="fixed" (ionRefresh)="cargar($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
+
+  <!-- La lista se lleva el ancho completo: es lo que se viene a mirar. Crear y editar
+       viven en el modal, que es lo ocasional. -->
   <div class="admin">
-    <div class="g2">
-      <!-- Crear / editar -->
-      <div class="cd">
+    <div class="promo-header">
+      <span class="cd-title"><ion-icon name="pricetags-outline"></ion-icon> Promociones</span>
+      <button class="btn btn-cr btn-sm nueva-cta" (click)="abrirModal()">
+        <ion-icon name="add"></ion-icon> Nueva promoción
+      </button>
+    </div>
+
+    <div class="promo-tools">
+      <div class="adm-buscador">
+        <ion-icon name="search-outline" class="bs-lupa"></ion-icon>
+        <input type="text" [(ngModel)]="busqueda" placeholder="Buscar por título o descripción…">
+        <button type="button" class="bs-x" *ngIf="busqueda" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
+          <ion-icon name="close-circle"></ion-icon>
+        </button>
+      </div>
+    </div>
+
+    <div class="promo-progress" *ngIf="promos.length">
+      {{ activas }} de {{ promos.length }} visibles para el cliente
+    </div>
+
+    <div *ngIf="cargando" class="promo-grid">
+      <div class="sk-dark" style="height:220px"></div>
+      <div class="sk-dark" style="height:220px"></div>
+    </div>
+
+    <div class="promo-grid" *ngIf="!cargando && filtradas.length">
+      <div class="promo-card" *ngFor="let p of filtradas" [class.inactiva]="!p.activa">
+        <img *ngIf="p.imagen" [src]="p.imagen" alt="" class="promo-img">
+        <div class="promo-img-ph" *ngIf="!p.imagen"><ion-icon name="gift-outline"></ion-icon></div>
+        <div class="promo-body">
+          <div class="promo-head">
+            <h4>{{ p.titulo }}</h4>
+            <span class="bg" [ngClass]="p.activa ? 'bg-em' : 'bg-rd'">{{ p.activa ? 'Activa' : 'Inactiva' }}</span>
+          </div>
+          <p>{{ p.descripcion }}</p>
+          <div class="promo-foot">
+            <span class="promo-price" *ngIf="p.precio_final">{{ p.precio_final | currency:'CRC':'symbol-narrow':'1.0-0' }}</span>
+            <span class="bg bg-cr" *ngIf="!p.precio_final && p.descuento">-{{ p.descuento }}%</span>
+            <div class="promo-btns">
+              <button class="btn btn-ou btn-sm" (click)="editar(p)">Editar</button>
+              <button class="btn btn-sm" [ngClass]="p.activa ? 'btn-am' : 'btn-em'" (click)="toggle(p)"
+                      [title]="p.activa ? 'Dejar de mostrar' : 'Mostrar al cliente'">
+                <ion-icon [name]="p.activa ? 'pause-outline' : 'play-outline'"></ion-icon>
+              </button>
+              <button class="btn btn-rd btn-sm" (click)="borrar(p)" title="Eliminar"><ion-icon name="trash-outline"></ion-icon></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- "No hay ninguna" y "el filtro no encontró nada" son problemas distintos. -->
+    <div class="empty" *ngIf="!cargando && !filtradas.length">
+      <ion-icon [name]="filtrando ? 'search-outline' : 'pricetags-outline'"></ion-icon>
+      <p *ngIf="filtrando">Ninguna promoción coincide con «{{ busqueda }}».</p>
+      <p *ngIf="!filtrando">Todavía no hay promociones. Creá la primera para que aparezca en el portal.</p>
+      <button type="button" class="btn btn-sm empty-accion" *ngIf="filtrando" (click)="busqueda = ''">Limpiar búsqueda</button>
+    </div>
+  </div>
+</ion-content>
+
+<!-- Ionic monta el modal fuera de .admin-dark: de ahí la clase repetida adentro. -->
+<ion-modal class="adm-modal" [isOpen]="modalAbierto" (didDismiss)="cerrarModal()">
+  <ng-template>
+    <div class="admin-dark adm-modal-box">
+      <div class="amb-head">
         <span class="cd-title">{{ editId ? 'Editar promoción' : 'Crear promoción' }}</span>
-        <div class="fg"><label>Título *</label><input [(ngModel)]="form.titulo" placeholder="Ej: 20% en cambio de aceite"></div>
+        <button type="button" class="amb-x" (click)="cerrarModal()" aria-label="Cerrar">
+          <ion-icon name="close"></ion-icon>
+        </button>
+      </div>
+
+      <div class="amb-body">
+        <div class="fg"><label>Título *</label><input maxlength="120" [(ngModel)]="form.titulo" placeholder="Ej: 20% en cambio de aceite"></div>
         <div class="fg"><label>Descripción *</label><textarea [(ngModel)]="form.descripcion" placeholder="Detalle, condiciones y vigencia…"></textarea></div>
         <div class="fg-row">
           <div class="fg"><label>Descuento (%)</label><input type="number" min="0" max="100" [(ngModel)]="form.descuento" placeholder="20"></div>
@@ -25,46 +99,22 @@
             <img *ngIf="form.imagen" [src]="form.imagen" alt="">
             <ng-container *ngIf="!form.imagen"><div class="up-ico"><ion-icon name="camera-outline"></ion-icon></div><div class="up-txt">Clic para subir imagen</div></ng-container>
           </div>
+          <button type="button" class="btn btn-sm promo-quitar-img" *ngIf="form.imagen" (click)="quitarImagen()">Quitar imagen</button>
         </div>
-        <div class="fg" style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-          <input type="checkbox" id="activa-now" [(ngModel)]="form.activa" style="width:auto;margin:0">
-          <label for="activa-now" style="text-transform:none;letter-spacing:0;color:var(--tx);margin:0;cursor:pointer">Activar promoción</label>
-        </div>
-        <button class="btn btn-cr btn-block" (click)="guardar()" [disabled]="!valido || guardando">{{ guardando ? 'Guardando…' : (editId ? 'Guardar cambios' : 'Guardar promoción') }}</button>
-        <button class="btn btn-ou btn-block" style="margin-top:8px" *ngIf="editId" (click)="cancelar()">Cancelar edición</button>
+        <label class="promo-activar">
+          <input type="checkbox" [(ngModel)]="form.activa">
+          <span>Mostrarla en el portal del cliente</span>
+        </label>
       </div>
 
-      <!-- Lista -->
-      <div>
-        <span class="cd-title"><ion-icon name="pricetags-outline"></ion-icon> Promociones</span>
-        <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:10px">
-          <div class="sk-dark" style="height:120px"></div>
-          <div class="sk-dark" style="height:120px"></div>
-        </div>
-        <div class="promo-grid" *ngIf="!cargando">
-          <div class="promo-card" *ngFor="let p of promos" [class.inactiva]="!p.activa">
-            <img *ngIf="p.imagen" [src]="p.imagen" alt="" class="promo-img">
-            <div class="promo-img-ph" *ngIf="!p.imagen"><ion-icon name="gift-outline"></ion-icon></div>
-            <div class="promo-body">
-              <div class="promo-head">
-                <h4>{{ p.titulo }}</h4>
-                <span class="bg" [ngClass]="p.activa ? 'bg-em' : 'bg-rd'">{{ p.activa ? 'Activa' : 'Inactiva' }}</span>
-              </div>
-              <p>{{ p.descripcion }}</p>
-              <div class="promo-foot">
-                <span class="promo-price" *ngIf="p.precio_final">{{ p.precio_final | currency:'CRC':'symbol-narrow':'1.0-0' }}</span>
-                <span class="bg bg-cr" *ngIf="!p.precio_final && p.descuento">-{{ p.descuento }}%</span>
-                <div class="promo-btns">
-                  <button class="btn btn-ou btn-sm" (click)="editar(p)">Editar</button>
-                  <button class="btn btn-sm" [ngClass]="p.activa ? 'btn-am' : 'btn-em'" (click)="toggle(p)"><ion-icon [name]="p.activa ? 'pause-outline' : 'play-outline'"></ion-icon></button>
-                  <button class="btn btn-rd btn-sm" (click)="borrar(p)"><ion-icon name="trash-outline"></ion-icon></button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="empty" *ngIf="!promos.length"><ion-icon name="pricetags-outline"></ion-icon><p>Sin promociones.</p></div>
+      <div class="amb-foot">
+        <div class="amb-btns">
+          <button type="button" class="btn" (click)="cerrarModal()">Cancelar</button>
+          <button type="button" class="btn btn-cr" (click)="guardar()" [disabled]="!valido || guardando">
+            {{ guardando ? 'Guardando…' : (editId ? 'Guardar cambios' : 'Crear promoción') }}
+          </button>
         </div>
       </div>
     </div>
-  </div>
-</ion-content>
+  </ng-template>
+</ion-modal>
