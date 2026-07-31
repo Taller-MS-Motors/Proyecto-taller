@@ -10,56 +10,44 @@
   <ion-refresher slot="fixed" (ionRefresh)="cargar($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
 
   <div class="admin">
-    <!-- Asignar nueva tarea -->
-    <div class="cd mb">
-      <span class="cd-title">Asignar nueva tarea</span>
-      <div class="fg">
-        <label>Mecánico</label>
-        <select [(ngModel)]="form.tecnico_id">
-          <option [ngValue]="null" disabled>Elegí un mecánico…</option>
-          <option *ngFor="let t of tecnicos" [ngValue]="t.id">{{ t.nombre }}</option>
-        </select>
-        <div class="hint" *ngIf="!tecnicos.length">No hay mecánicos activos. Creá uno en Empleados.</div>
-      </div>
-      <div class="fg">
-        <label>Tarea</label>
-        <input type="text" [(ngModel)]="form.titulo" placeholder="¿Qué hay que hacer?">
-      </div>
-      <div class="fg">
-        <label>Detalle (opcional)</label>
-        <input type="text" [(ngModel)]="form.detalle" placeholder="Notas o instrucciones…">
-      </div>
-      <div class="fg-row">
-        <div class="fg">
-          <label>Prioridad</label>
-          <select [(ngModel)]="form.prioridad">
-            <option *ngFor="let p of prioridades" [value]="p.v">{{ p.l }}</option>
-          </select>
-        </div>
-        <div class="fg">
-          <label>Vence (opcional)</label>
-          <input type="date" [(ngModel)]="form.vence">
-        </div>
-      </div>
-      <button class="btn btn-cr btn-block" (click)="asignar()" [disabled]="guardando">{{ guardando ? 'Asignando…' : 'Asignar tarea' }}</button>
-    </div>
-
-    <!-- Tareas asignadas -->
+    <!-- Tareas asignadas: es lo que se viene a consultar, así que se lleva la pantalla.
+         Asignar es ocasional y vive en el modal. -->
     <div class="cd">
       <div class="tareas-header">
         <span class="cd-title"><ion-icon name="clipboard-outline"></ion-icon> Tareas asignadas</span>
+        <button class="btn btn-cr btn-sm asignar-cta" (click)="abrirModal()">
+          <ion-icon name="add"></ion-icon> Asignar tarea
+        </button>
+      </div>
+
+      <div class="tareas-tools">
+        <div class="buscador">
+          <ion-icon name="search-outline" class="bs-lupa"></ion-icon>
+          <input type="text" [(ngModel)]="busqueda" placeholder="Buscar por tarea, detalle o mecánico…">
+          <button type="button" class="bs-x" *ngIf="busqueda" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
+            <ion-icon name="close-circle"></ion-icon>
+          </button>
+        </div>
         <select class="tareas-filter" [(ngModel)]="empleado" (ngModelChange)="cargar()">
           <option [ngValue]="null">Todos los mecánicos</option>
           <option *ngFor="let t of tecnicos" [ngValue]="t.id">{{ t.nombre }}</option>
         </select>
+        <label class="ver-hechas">
+          <input type="checkbox" [(ngModel)]="verHechas">
+          <span>Ver completadas</span>
+        </label>
       </div>
-      <div class="tareas-progress" *ngIf="total">{{ hechas }}/{{ total }} completadas</div>
 
-      <div class="tbl-wrap">
+      <div class="tareas-progress" *ngIf="total">
+        {{ hechas }}/{{ total }} completadas
+        <span *ngIf="!verHechas && hechas" class="tp-ocultas">· {{ hechas }} oculta{{ hechas > 1 ? 's' : '' }}</span>
+      </div>
+
+      <div class="tbl-wrap" *ngIf="tareasFiltradas.length">
         <table class="tbl">
           <thead><tr><th>Mecánico</th><th>Tarea</th><th>Prioridad</th><th>Vence</th><th>Estado</th><th></th></tr></thead>
           <tbody>
-            <tr *ngFor="let t of tareas" [style.opacity]="t.hecha ? '.55' : '1'">
+            <tr *ngFor="let t of tareasFiltradas" [style.opacity]="t.hecha ? '.55' : '1'">
               <td class="fw-600">{{ t.tecnico_nombre }}</td>
               <td>
                 <strong>{{ t.titulo }}</strong>
@@ -73,10 +61,75 @@
           </tbody>
         </table>
       </div>
-      <div class="empty" *ngIf="!cargando && !tareas.length">
-        <ion-icon name="clipboard-outline"></ion-icon>
-        <p>No hay tareas asignadas{{ empleado ? ' a este mecánico' : '' }}.</p>
+
+      <!-- Se distingue "no hay nada" de "el filtro no encontró nada": son problemas
+           distintos y la salida del usuario también. -->
+      <div class="empty" *ngIf="!cargando && !tareasFiltradas.length">
+        <ion-icon [name]="filtrando ? 'search-outline' : 'clipboard-outline'"></ion-icon>
+        <p *ngIf="filtrando">Ninguna tarea coincide con «{{ busqueda }}».</p>
+        <p *ngIf="!filtrando && !total">No hay tareas asignadas{{ empleado ? ' a este mecánico' : '' }}.</p>
+        <p *ngIf="!filtrando && total">Todo al día: no queda ninguna tarea pendiente.</p>
+        <button type="button" class="btn btn-sm empty-accion" *ngIf="filtrando" (click)="busqueda = ''">Limpiar búsqueda</button>
+        <button type="button" class="btn btn-sm empty-accion" *ngIf="!filtrando && total && !verHechas" (click)="verHechas = true">
+          Ver las {{ hechas }} completadas
+        </button>
       </div>
     </div>
   </div>
 </ion-content>
+
+<!-- El modal se monta fuera de .admin-dark (Ionic lo saca a la raíz del DOM), así que
+     la clase se vuelve a aplicar adentro o los tokens del panel no se heredan. -->
+<ion-modal class="tarea-modal" [isOpen]="modalAbierto" (didDismiss)="cerrarModal()">
+  <ng-template>
+    <div class="admin-dark tm">
+      <div class="tm-head">
+        <span class="cd-title">Asignar nueva tarea</span>
+        <button type="button" class="tm-x" (click)="cerrarModal()" aria-label="Cerrar">
+          <ion-icon name="close"></ion-icon>
+        </button>
+      </div>
+
+      <div class="tm-body">
+        <div class="fg">
+          <label>Mecánico</label>
+          <select [(ngModel)]="form.tecnico_id">
+            <option [ngValue]="null" disabled>Elegí un mecánico…</option>
+            <option *ngFor="let t of tecnicos" [ngValue]="t.id">{{ t.nombre }}</option>
+          </select>
+          <div class="hint" *ngIf="!tecnicos.length">No hay mecánicos activos. Creá uno en Empleados.</div>
+        </div>
+        <div class="fg">
+          <label>Tarea</label>
+          <input type="text" [(ngModel)]="form.titulo" placeholder="¿Qué hay que hacer?" (keyup.enter)="asignar()">
+        </div>
+        <div class="fg">
+          <label>Detalle (opcional)</label>
+          <input type="text" [(ngModel)]="form.detalle" placeholder="Notas o instrucciones…">
+        </div>
+        <div class="fg-row">
+          <div class="fg">
+            <label>Prioridad</label>
+            <select [(ngModel)]="form.prioridad">
+              <option *ngFor="let p of prioridades" [value]="p.v">{{ p.l }}</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Vence (opcional)</label>
+            <input type="date" [(ngModel)]="form.vence">
+          </div>
+        </div>
+      </div>
+
+      <div class="tm-foot">
+        <span class="tm-tip">El modal queda abierto para cargarle varias seguidas.</span>
+        <div class="tm-btns">
+          <button type="button" class="btn" (click)="cerrarModal()">Listo</button>
+          <button type="button" class="btn btn-cr" (click)="asignar()" [disabled]="guardando">
+            {{ guardando ? 'Asignando…' : 'Asignar tarea' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>

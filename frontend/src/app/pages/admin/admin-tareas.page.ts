@@ -19,6 +19,13 @@ export class AdminTareasPage implements OnInit, OnDestroy {
   cargando = true;
   guardando = false;
   empleado: number | null = null; // filtro de la lista
+  modalAbierto = false;
+
+  // Filtros de la lista (todos del lado del cliente: las tareas ya vienen cargadas).
+  busqueda = '';
+  // Las tareas hechas no se archivan nunca, así que por defecto se ocultan: la
+  // pantalla se abre para ver lo que falta, no el historial.
+  verHechas = false;
   form: { tecnico_id: number | null; titulo: string; detalle: string; prioridad: string; vence: string } =
     { tecnico_id: null, titulo: '', detalle: '', prioridad: 'normal', vence: '' };
 
@@ -49,8 +56,28 @@ export class AdminTareasPage implements OnInit, OnDestroy {
     });
   }
 
+  // El progreso cuenta SIEMPRE sobre el total, no sobre lo filtrado: si dijera
+  // "0/0 completadas" al ocultar las hechas, el número perdería sentido.
   get total(): number { return this.tareas.length; }
   get hechas(): number { return this.tareas.filter(t => t.hecha).length; }
+
+  get tareasFiltradas(): any[] {
+    const q = this.busqueda.trim().toLowerCase();
+    return this.tareas.filter(t => {
+      if (!this.verHechas && t.hecha) return false;
+      if (!q) return true;
+      return [t.titulo, t.detalle, t.tecnico_nombre].some(c => (c || '').toLowerCase().includes(q));
+    });
+  }
+
+  // Para distinguir "no hay nada" de "la búsqueda no encontró nada".
+  get filtrando(): boolean { return !!this.busqueda.trim(); }
+
+  abrirModal() {
+    this.form = { tecnico_id: this.form.tecnico_id, titulo: '', detalle: '', prioridad: 'normal', vence: '' };
+    this.modalAbierto = true;
+  }
+  cerrarModal() { this.modalAbierto = false; }
 
   asignar() {
     if (!this.form.tecnico_id) { this.aviso('Elegí un mecánico', 'warning'); return; }
@@ -65,7 +92,8 @@ export class AdminTareasPage implements OnInit, OnDestroy {
     }).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.guardando = false;
-        // Conserva el mecánico para asignar varias tareas seguidas.
+        // El modal queda abierto y se conserva el mecánico: así se le cargan varias
+        // tareas seguidas sin reabrirlo ni volver a elegirlo en cada una.
         this.form = { tecnico_id: this.form.tecnico_id, titulo: '', detalle: '', prioridad: 'normal', vence: '' };
         this.cargar();
         this.aviso('Tarea asignada');

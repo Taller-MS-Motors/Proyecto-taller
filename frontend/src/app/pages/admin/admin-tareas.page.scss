@@ -1,5 +1,6 @@
 // ────────────────────────────────────────────────
 // Admin Tareas — component-scoped styles
+// Hereda los tokens (--sur, --bd, --tx…) de .admin-dark global.
 // ────────────────────────────────────────────────
 
 .tareas-header {
@@ -15,6 +16,66 @@
   margin: 0;
 }
 
+.asignar-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  ion-icon { font-size: 15px; }
+}
+
+// —— Barra de filtros ——
+.tareas-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.buscador {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 220px;
+
+  .bs-lupa {
+    position: absolute;
+    left: 10px;
+    font-size: 15px;
+    color: var(--tx3);
+    pointer-events: none;
+  }
+
+  input {
+    width: 100%;
+    padding: 8px 30px 8px 32px;
+    border: 1px solid var(--bd);
+    border-radius: 8px;
+    background: var(--sur2);
+    color: var(--tx);
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s;
+
+    &:focus { border-color: var(--cr); }
+    &::placeholder { color: var(--tx3); }
+  }
+
+  .bs-x {
+    position: absolute;
+    right: 6px;
+    background: none;
+    border: none;
+    padding: 2px;
+    line-height: 0;
+    color: var(--tx3);
+    cursor: pointer;
+    &:hover { color: var(--tx); }
+    ion-icon { font-size: 15px; }
+  }
+}
+
 .tareas-filter {
   padding: 7px 10px;
   border: 1px solid var(--bd);
@@ -25,10 +86,26 @@
   font-family: inherit;
 }
 
+.ver-hechas {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tx2);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+
+  input { accent-color: var(--cr); width: 14px; height: 14px; cursor: pointer; }
+  &:hover { color: var(--tx); }
+}
+
 .tareas-progress {
   font-size: 12px;
   color: var(--tx2);
   margin-bottom: 12px;
+
+  .tp-ocultas { color: var(--tx3); }
 }
 
 .tareas-detalle {
@@ -48,4 +125,69 @@
   &.vencida {
     color: var(--rd);
   }
+}
+
+.empty-accion {
+  margin-top: 10px;
+}
+
+// —— Modal de asignación ——
+// Alto automático: el contenido es corto y un modal a pantalla completa para seis
+// campos se siente desproporcionado en escritorio.
+ion-modal.tarea-modal {
+  --width: 92%;
+  --max-width: 520px;
+  --height: auto;
+  --border-radius: 24px;
+  --background: var(--sur, #111);
+  --box-shadow: 0 20px 60px rgba(0, 0, 0, .55);
+}
+
+.tm {
+  background: var(--sur);
+  color: var(--tx);
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+}
+
+.tm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 20px 20px 0;
+
+  .cd-title { margin: 0; }
+
+  .tm-x {
+    background: none;
+    border: none;
+    color: var(--tx3);
+    cursor: pointer;
+    padding: 4px;
+    line-height: 0;
+    border-radius: 8px;
+    &:hover { color: var(--tx); background: var(--sur2); }
+    ion-icon { font-size: 20px; }
+  }
+}
+
+.tm-body {
+  padding: 16px 20px 4px;
+  overflow-y: auto;
+}
+
+.tm-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 20px 20px;
+  border-top: 1px solid var(--bd);
+  margin-top: 8px;
+
+  .tm-tip { font-size: 11px; color: var(--tx3); flex: 1 1 140px; }
+  .tm-btns { display: flex; gap: 8px; margin-left: auto; }
 }
