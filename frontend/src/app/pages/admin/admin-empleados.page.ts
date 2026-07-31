@@ -27,23 +27,10 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
 
   eliminando: number | null = null;
 
-  // Abajo de 860px el .g2 deja de ser de dos columnas y el formulario pasa a
-  // empujar la lista fuera de la pantalla; ahí se convierte en modal. El mismo
-  // umbral que usa el layout, para que no haya un tramo con las dos cosas mal.
-  private static readonly MOVIL = '(max-width: 859.98px)';
-  private mq: MediaQueryList | null = null;
-  private onMq = (e: MediaQueryListEvent | MediaQueryList) => {
-    this.esMovil = e.matches;
-    // Al ensancharse la ventana el formulario de ALTA vuelve a la tarjeta: dejar el
-    // modal abierto lo mostraría dos veces. La edición no tiene versión en línea, así
-    // que se respeta — si no, ensanchar la ventana descartaba los cambios a medio hacer.
-    if (!this.esMovil && !this.editandoId) this.modalAbierto = false;
-  };
-  esMovil = false;
+  // Alta y edición viven las dos en el modal, en cualquier ancho: la lista se lleva
+  // la pantalla, que es lo que se viene a mirar.
   modalAbierto = false;
-
-  // Edición de un empleado ya creado. En escritorio el alta vive en su tarjeta, así
-  // que editar SIEMPRE abre el modal, sea cual sea el ancho.
+  busqueda = '';
   editandoId: number | null = null;
   editando = {
     nombre: '', email: '', telefono: '',
@@ -59,12 +46,19 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit() {
-    this.mq = window.matchMedia(AdminEmpleadosPage.MOVIL);
-    this.esMovil = this.mq.matches;
-    this.mq.addEventListener('change', this.onMq);
     this.cargar();
     this.cargarSucursales();
   }
+
+  get filtrados(): Usuario[] {
+    const q = this.busqueda.trim().toLowerCase();
+    if (!q) return this.usuarios;
+    return this.usuarios.filter(u =>
+      [u.nombre, u.email, u.telefono, this.rolLabel[u.rol] || u.rol]
+        .some(c => (c || '').toLowerCase().includes(q)));
+  }
+  get activos(): number { return this.usuarios.filter(u => u.activo).length; }
+  get filtrando(): boolean { return !!this.busqueda.trim(); }
   ionViewWillEnter() { this.cargar(); }
 
   abrirModal() { this.editandoId = null; this.modalAbierto = true; }
@@ -200,11 +194,7 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
     this.svc.toggleActivo(u.id!, !u.activo).pipe(takeUntil(this.destroy$)).subscribe({ next: () => { u.activo = u.activo ? 0 : 1; } });
   }
 
-  ngOnDestroy() {
-    this.mq?.removeEventListener('change', this.onMq);
-    this.destroy$.next();
-    this.destroy$.complete();
-  }
+  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
 
   iniciales(n?: string): string {
     const p = (n || '?').trim().split(/\s+/);

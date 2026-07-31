@@ -10,10 +10,24 @@
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
 
   .cd-title { margin: 0; }
+}
+
+.emp-tools {
+  margin-bottom: 12px;
+}
+
+.emp-progress {
+  font-size: 12px;
+  color: var(--tx2);
+  margin-bottom: 14px;
+}
+
+.empty-accion {
+  margin-top: 10px;
 }
 
 .nuevo-cta {
