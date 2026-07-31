@@ -6,7 +6,7 @@ const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { getConfig, clearCache } = require('../utils/configuracion');
 const { getSucursales, clearCache: clearSucursalesCache } = require('../utils/sucursales');
-const { fotoValida } = require('../utils/validar');
+const { fotoValida, textoDentroDeLimite } = require('../utils/validar');
 
 // Panel del administrador: métricas ejecutivas. Solo admin.
 router.use(auth, requireRol('admin'));
@@ -291,6 +291,20 @@ router.get('/reportes', async (req, res) => {
 // Asignar tareas a los mecánicos (Fase C)
 // ───────────────────────────────────────────────────────────
 const PRIORIDADES = ['baja', 'normal', 'alta', 'urgente'];
+// Topes de la tabla (titulo VARCHAR(150), detalle VARCHAR(300)). Sin comprobarlos,
+// un texto más largo no se recorta: MySQL en modo estricto corta la petición con un
+// 500 en vez de decir qué pasó.
+const MAX_TITULO = 150;
+const MAX_DETALLE = 300;
+
+// Validación común de alta y edición de tareas. Devuelve el mensaje de error, o null.
+function validarTarea({ titulo, detalle, tecnico_id }) {
+  if (!tecnico_id) return 'Elegí un mecánico';
+  if (!titulo || !titulo.trim()) return 'El título es requerido';
+  if (!textoDentroDeLimite(titulo, MAX_TITULO)) return `El título no puede pasar de ${MAX_TITULO} caracteres`;
+  if (!textoDentroDeLimite(detalle, MAX_DETALLE)) return `El detalle no puede pasar de ${MAX_DETALLE} caracteres`;
+  return null;
+}
 
 // GET /api/admin/tareas?empleado= — tareas asignadas por el admin (monitoreo).
 router.get('/tareas', async (req, res) => {
@@ -319,8 +333,8 @@ router.get('/tareas', async (req, res) => {
 router.post('/tareas', async (req, res) => {
   try {
     const { tecnico_id, titulo, detalle, prioridad, vence } = req.body;
-    if (!tecnico_id) return res.status(400).json({ error: 'Elegí un mecánico' });
-    if (!titulo || !titulo.trim()) return res.status(400).json({ error: 'El título es requerido' });
+    const error = validarTarea({ titulo, detalle, tecnico_id });
+    if (error) return res.status(400).json({ error });
     const [[tec]] = await pool.query(
       "SELECT id FROM usuarios WHERE id = ? AND rol = 'tecnico' AND activo = 1", [tecnico_id]
     );
@@ -332,6 +346,39 @@ router.post('/tareas', async (req, res) => {
     );
     const [[nueva]] = await pool.query('SELECT * FROM tareas_mecanico WHERE id = ?', [r.insertId]);
     res.status(201).json({ data: nueva, message: 'Tarea asignada' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// PUT /api/admin/tareas/:id — corregir una tarea ya asignada (se puso mal el mecánico,
+// cambió la prioridad, se movió la fecha). Mismas validaciones que al crearla.
+// El estado `hecha` no se toca acá a propósito: eso lo marca el mecánico desde su panel.
+router.put('/tareas/:id', async (req, res) => {
+  try {
+    const { tecnico_id, titulo, detalle, prioridad, vence } = req.body;
+    const error = validarTarea({ titulo, detalle, tecnico_id });
+    if (error) return res.status(400).json({ error });
+
+    // Igual que el DELETE: el admin solo administra lo que él asignó. Las tareas que
+    // el técnico se crea a sí mismo (asignado_por NULL) son suyas y no se tocan.
+    const [[existente]] = await pool.query(
+      'SELECT id FROM tareas_mecanico WHERE id = ? AND asignado_por IS NOT NULL', [req.params.id]
+    );
+    if (!existente) return res.status(404).json({ error: 'Tarea no encontrada' });
+
+    const [[tec]] = await pool.query(
+      "SELECT id FROM usuarios WHERE id = ? AND rol = 'tecnico' AND activo = 1", [tecnico_id]
+    );
+    if (!tec) return res.status(400).json({ error: 'Mecánico no válido' });
+
+    const prio = PRIORIDADES.includes(prioridad) ? prioridad : 'normal';
+    await pool.query(
+      'UPDATE tareas_mecanico SET tecnico_id = ?, titulo = ?, detalle = ?, prioridad = ?, vence = ? WHERE id = ?',
+      [tecnico_id, titulo.trim(), (detalle || '').trim() || null, prio, vence || null, req.params.id]
+    );
+    const [[actualizada]] = await pool.query('SELECT * FROM tareas_mecanico WHERE id = ?', [req.params.id]);
+    res.json({ data: actualizada, message: 'Tarea actualizada' });
   } catch (err) {
     fail(res, err);
   }

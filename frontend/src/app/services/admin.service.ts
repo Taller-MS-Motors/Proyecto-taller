@@ -52,6 +52,9 @@ export class AdminService {
   crearTarea(t: { tecnico_id: number; titulo: string; detalle?: string; prioridad?: string; vence?: string | null }): Observable<{ data: any }> {
     return this.http.post<{ data: any }>(`${this.url}/tareas`, t);
   }
+  editarTarea(id: number, t: { tecnico_id: number; titulo: string; detalle?: string; prioridad?: string; vence?: string | null }): Observable<{ data: any }> {
+    return this.http.put<{ data: any }>(`${this.url}/tareas/${id}`, t);
+  }
   borrarTarea(id: number): Observable<any> {
     return this.http.delete(`${this.url}/tareas/${id}`);
   }

@@ -131,6 +131,14 @@
   margin-top: 10px;
 }
 
+// Editar / Eliminar: envuelven en pantallas angostas en vez de estirar la columna.
+.fila-acciones {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 // —— Modal de asignación ——
 // Alto automático: el contenido es corto y un modal a pantalla completa para seis
 // campos se siente desproporcionado en escritorio.

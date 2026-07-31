@@ -20,6 +20,8 @@ export class AdminTareasPage implements OnInit, OnDestroy {
   guardando = false;
   empleado: number | null = null; // filtro de la lista
   modalAbierto = false;
+  // null = estamos creando; con id = estamos corrigiendo esa tarea.
+  editandoId: number | null = null;
 
   // Filtros de la lista (todos del lado del cliente: las tareas ya vienen cargadas).
   busqueda = '';
@@ -74,31 +76,62 @@ export class AdminTareasPage implements OnInit, OnDestroy {
   get filtrando(): boolean { return !!this.busqueda.trim(); }
 
   abrirModal() {
+    this.editandoId = null;
     this.form = { tecnico_id: this.form.tecnico_id, titulo: '', detalle: '', prioridad: 'normal', vence: '' };
     this.modalAbierto = true;
   }
-  cerrarModal() { this.modalAbierto = false; }
 
-  asignar() {
+  abrirEdicion(t: any) {
+    this.editandoId = t.id;
+    this.form = {
+      tecnico_id: t.tecnico_id,
+      titulo: t.titulo || '',
+      detalle: t.detalle || '',
+      prioridad: t.prioridad || 'normal',
+      // La fecha llega como Date o como ISO según la capa; con los 10 primeros
+      // caracteres alcanza para input[type=date] y se evita el corrimiento de un
+      // día que produce convertir a Date y volver (la zona del taller es UTC-6).
+      vence: t.vence ? String(t.vence).slice(0, 10) : '',
+    };
+    this.modalAbierto = true;
+  }
+
+  cerrarModal() { this.modalAbierto = false; this.editandoId = null; }
+
+  guardar() {
     if (!this.form.tecnico_id) { this.aviso('Elegí un mecánico', 'warning'); return; }
     if (!this.form.titulo.trim()) { this.aviso('Escribí un título', 'warning'); return; }
-    this.guardando = true;
-    this.admin.crearTarea({
+
+    const datos = {
       tecnico_id: this.form.tecnico_id,
       titulo: this.form.titulo.trim(),
       detalle: this.form.detalle.trim() || undefined,
       prioridad: this.form.prioridad,
       vence: this.form.vence || null,
-    }).pipe(takeUntil(this.destroy$)).subscribe({
+    };
+    const editando = this.editandoId;
+    this.guardando = true;
+
+    const req$ = editando ? this.admin.editarTarea(editando, datos) : this.admin.crearTarea(datos);
+    req$.pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.guardando = false;
-        // El modal queda abierto y se conserva el mecánico: así se le cargan varias
-        // tareas seguidas sin reabrirlo ni volver a elegirlo en cada una.
-        this.form = { tecnico_id: this.form.tecnico_id, titulo: '', detalle: '', prioridad: 'normal', vence: '' };
         this.cargar();
-        this.aviso('Tarea asignada');
+        if (editando) {
+          // Corregir una tarea es puntual: se cierra y listo.
+          this.cerrarModal();
+          this.aviso('Tarea actualizada');
+        } else {
+          // Al asignar, el modal queda abierto y conserva el mecánico: así se le
+          // cargan varias seguidas sin reabrirlo ni volver a elegirlo en cada una.
+          this.form = { tecnico_id: this.form.tecnico_id, titulo: '', detalle: '', prioridad: 'normal', vence: '' };
+          this.aviso('Tarea asignada');
+        }
       },
-      error: (err) => { this.guardando = false; this.aviso(err.error?.error || 'No se pudo asignar', 'danger'); },
+      error: (err) => {
+        this.guardando = false;
+        this.aviso(err.error?.error || (editando ? 'No se pudo actualizar' : 'No se pudo asignar'), 'danger');
+      },
     });
   }
 
