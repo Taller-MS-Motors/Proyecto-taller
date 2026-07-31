@@ -34,12 +34,22 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
   private mq: MediaQueryList | null = null;
   private onMq = (e: MediaQueryListEvent | MediaQueryList) => {
     this.esMovil = e.matches;
-    // Al ensancharse la ventana el formulario vuelve a la tarjeta: dejar el modal
-    // abierto lo mostraría dos veces.
-    if (!this.esMovil) this.modalAbierto = false;
+    // Al ensancharse la ventana el formulario de ALTA vuelve a la tarjeta: dejar el
+    // modal abierto lo mostraría dos veces. La edición no tiene versión en línea, así
+    // que se respeta — si no, ensanchar la ventana descartaba los cambios a medio hacer.
+    if (!this.esMovil && !this.editandoId) this.modalAbierto = false;
   };
   esMovil = false;
   modalAbierto = false;
+
+  // Edición de un empleado ya creado. En escritorio el alta vive en su tarjeta, así
+  // que editar SIEMPRE abre el modal, sea cual sea el ancho.
+  editandoId: number | null = null;
+  editando = {
+    nombre: '', email: '', telefono: '',
+    rol: 'tecnico' as Usuario['rol'],
+    sucursal_id: null as number | null,
+  };
 
   constructor(
     private svc: UsuariosService,
@@ -57,8 +67,41 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
   }
   ionViewWillEnter() { this.cargar(); }
 
-  abrirModal() { this.modalAbierto = true; }
-  cerrarModal() { this.modalAbierto = false; }
+  abrirModal() { this.editandoId = null; this.modalAbierto = true; }
+  cerrarModal() { this.modalAbierto = false; this.editandoId = null; }
+
+  abrirEdicion(u: Usuario) {
+    this.editandoId = u.id!;
+    this.editando = {
+      nombre: u.nombre || '',
+      email: u.email || '',
+      rol: u.rol || 'tecnico',
+      telefono: u.telefono || '',
+      sucursal_id: u.sucursal_id ?? null,
+    };
+    this.modalAbierto = true;
+  }
+
+  get edicionValida(): boolean {
+    return !!(this.editando.nombre.trim() && this.editando.email.trim());
+  }
+
+  guardarEdicion() {
+    if (!this.edicionValida) { this.aviso('Nombre y correo son requeridos', 'warning'); return; }
+    this.creando = true;
+    this.svc.update(this.editandoId!, {
+      nombre: this.editando.nombre.trim(),
+      email: this.editando.email.trim(),
+      rol: this.editando.rol,
+      telefono: this.editando.telefono.trim() || undefined,
+      sucursal_id: this.editando.sucursal_id,
+    }).pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => { this.creando = false; this.cerrarModal(); this.cargar(); this.aviso('Empleado actualizado'); },
+      // El backend rechaza que un admin se quite a sí mismo el rol de admin: ese
+      // mensaje es el que hay que mostrar tal cual, no uno genérico.
+      error: e => { this.creando = false; this.aviso(e.error?.error || 'No se pudo actualizar', 'danger'); },
+    });
+  }
 
   cargar() {
     this.cargando = true;

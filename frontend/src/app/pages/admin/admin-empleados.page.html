@@ -81,6 +81,7 @@
             </div>
             <div class="emp-actions">
               <span class="bg" [ngClass]="u.activo ? 'bg-em' : 'bg-rd'">{{ u.activo ? 'Activo' : 'Inactivo' }}</span>
+              <button class="btn btn-sm" (click)="abrirEdicion(u)">Editar</button>
               <button class="btn btn-sm" [ngClass]="u.activo ? 'btn-rd' : 'btn-em'" (click)="toggle(u)">{{ u.activo ? 'Desactivar' : 'Activar' }}</button>
               <button class="btn btn-sm btn-ou" (click)="eliminar(u)" [disabled]="eliminando === u.id"
                       title="Eliminar definitivamente" aria-label="Eliminar empleado">
@@ -95,24 +96,53 @@
   </div>
 </ion-content>
 
-<!-- Solo en celular. Ionic lo monta fuera de .admin-dark, de ahí la clase repetida. -->
+<!-- Dos usos: el alta en celular, y la edición en cualquier ancho.
+     Ionic monta el modal fuera de .admin-dark, de ahí la clase repetida adentro. -->
 <ion-modal class="adm-modal" [isOpen]="modalAbierto" (didDismiss)="cerrarModal()">
   <ng-template>
     <div class="admin-dark adm-modal-box">
       <div class="amb-head">
-        <span class="cd-title">Crear nuevo empleado</span>
+        <span class="cd-title">{{ editandoId ? 'Editar empleado' : 'Crear nuevo empleado' }}</span>
         <button type="button" class="amb-x" (click)="cerrarModal()" aria-label="Cerrar">
           <ion-icon name="close"></ion-icon>
         </button>
       </div>
+
       <div class="amb-body">
-        <ng-container *ngTemplateOutlet="formEmpleado"></ng-container>
+        <!-- Alta: el formulario completo, con contraseña. -->
+        <ng-container *ngIf="!editandoId" [ngTemplateOutlet]="formEmpleado"></ng-container>
+
+        <!-- Edición: sin contraseña. Cambiarla es otra cosa y se hace desde el
+             perfil del propio empleado, no desde acá. -->
+        <ng-container *ngIf="editandoId">
+          <div class="fg"><label>Nombre completo *</label><input [(ngModel)]="editando.nombre" placeholder="Ej: Carlos García"></div>
+          <div class="fg"><label>Correo electrónico *</label><input type="email" [(ngModel)]="editando.email" placeholder="carlos@taller.com"></div>
+          <div class="fg"><label>Teléfono</label><input type="tel" [(ngModel)]="editando.telefono" placeholder="8888-8888"></div>
+          <div class="fg"><label>Rol *</label>
+            <select [(ngModel)]="editando.rol">
+              <option value="tecnico">Mecánico</option>
+              <option value="recepcion">Recepcionista</option>
+              <option value="admin">Administración</option>
+            </select>
+            <div class="hint">No podés quitarte a vos mismo el rol de administrador.</div>
+          </div>
+          <div class="fg" *ngIf="sucursales.length"><label>Sucursal</label>
+            <select [(ngModel)]="editando.sucursal_id">
+              <option [ngValue]="null">Ambas / sin asignar</option>
+              <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
+            </select>
+          </div>
+        </ng-container>
       </div>
+
       <div class="amb-foot">
         <div class="amb-btns">
           <button type="button" class="btn" (click)="cerrarModal()">Cancelar</button>
-          <button type="button" class="btn btn-cr" (click)="crear()" [disabled]="!valido || creando">
+          <button type="button" class="btn btn-cr" *ngIf="!editandoId" (click)="crear()" [disabled]="!valido || creando">
             {{ creando ? 'Creando…' : 'Crear empleado' }}
+          </button>
+          <button type="button" class="btn btn-cr" *ngIf="editandoId" (click)="guardarEdicion()" [disabled]="!edicionValida || creando">
+            {{ creando ? 'Guardando…' : 'Guardar cambios' }}
           </button>
         </div>
       </div>

@@ -11,9 +11,6 @@
       <ion-button [routerLink]="['/promociones']" title="Promociones" *ngIf="auth.tieneRol('admin')">
         <ion-icon slot="icon-only" name="pricetags-outline"></ion-icon>
       </ion-button>
-      <ion-button [routerLink]="['/usuarios']" title="Usuarios" *ngIf="auth.tieneRol('admin')">
-        <ion-icon slot="icon-only" name="people-outline"></ion-icon>
-      </ion-button>
       <ion-button (click)="logout()">
         <ion-icon slot="icon-only" name="log-out-outline"></ion-icon>
       </ion-button>

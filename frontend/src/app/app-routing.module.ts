@@ -89,12 +89,6 @@ const routes: Routes = [
     loadChildren: () => import('./pages/cita-form/cita-form.module').then(m => m.CitaFormPageModule),
   },
   {
-    path: 'usuarios',
-    canActivate: [AuthGuard, RolGuard],
-    data: { roles: ['admin'] },
-    loadChildren: () => import('./pages/usuarios/usuarios.module').then(m => m.UsuariosPageModule),
-  },
-  {
     path: 'garantias',
     canActivate: [AuthGuard, RolGuard],
     data: { roles: ['admin'] },

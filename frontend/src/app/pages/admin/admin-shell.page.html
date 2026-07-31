@@ -43,11 +43,18 @@
           </a>
 
           <div class="sb-section">Operación</div>
+          <a class="nav-item" routerLink="/tabs/ordenes">
+            <ion-icon name="document-text-outline"></ion-icon> Órdenes de trabajo
+          </a>
           <a class="nav-item" routerLink="/tabs/clientes">
             <ion-icon name="people-outline"></ion-icon> Clientes
           </a>
           <a class="nav-item" routerLink="/admin/servicios" routerLinkActive="on">
             <ion-icon name="construct-outline"></ion-icon> Servicios
+          </a>
+          <!-- Ruta admin-only que hasta ahora solo se alcanzaba escribiendo la URL. -->
+          <a class="nav-item" routerLink="/garantias" routerLinkActive="on">
+            <ion-icon name="shield-checkmark-outline"></ion-icon> Garantías
           </a>
 
           <div class="sb-section">Sistema</div>
