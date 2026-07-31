@@ -1,7 +1,7 @@
 # Informe de Pruebas No Funcionales — TallerMS / MS Motos
 
 **Fecha:** 31 de julio de 2026
-**Alcance:** API del backend bajo carga y estrés. El frontend queda pendiente (ver §7).
+**Alcance:** API del backend bajo carga y estrés (§4–§6) y Core Web Vitals del frontend (§6-bis).
 
 > **Nota sobre el enunciado.** La guía original asume un backend Laravel/PHP y pide
 > "versión PHP", Laravel Pulse y Telescope. Este proyecto es **Express/Node + MySQL**,
@@ -209,6 +209,57 @@ esté activo. Hay que verificar el efecto, no el estado del despliegue.
 
 ---
 
+## 6-bis. Frontend — Core Web Vitals
+
+Medido con **Lighthouse 13.4.1** contra el entorno desplegado
+(`/portal/login`, la puerta de entrada pública del cliente), en escritorio y en móvil
+con estrangulamiento de red y CPU simulados.
+
+| | Escritorio | Móvil (red simulada) | Umbral "bueno" |
+|---|---|---|---|
+| **Performance** | **95** | **84** | ≥ 90 |
+| Accesibilidad | 94 | 94 | ≥ 90 |
+| Buenas prácticas | **100** | **100** | ≥ 90 |
+| SEO | 75 | 75 | ≥ 90 |
+
+### Core Web Vitals
+
+| Métrica | Escritorio | Móvil | Umbral |
+|---|---|---|---|
+| **LCP** (mayor elemento visible) | **1,0 s** | **2,1 s** | < 2,5 s ✅ |
+| **CLS** (salto de diseño) | **0** | **0** | < 0,1 ✅ |
+| **TBT** (bloqueo del hilo) | 30 ms | **480 ms** | < 200 ms ⚠️ |
+| FCP | 0,5 s | 1,2 s | < 1,8 s ✅ |
+| Speed Index | 2,0 s | 4,8 s | < 3,4 s ⚠️ |
+| Time to Interactive | 1,8 s | 6,1 s | — |
+
+**Peso de la carga inicial:** 1 180 KB en 41 peticiones, de los cuales **514 KB son
+JavaScript** en 31 archivos.
+
+### Lectura
+
+**Lo bueno.** `CLS = 0` en ambos: nada se mueve mientras carga, que es el defecto más
+molesto de percibir y de los más difíciles de corregir después. El servidor responde el
+documento en 170 ms. Buenas prácticas en 100.
+
+**Lo que hay que mirar.** En móvil, **TBT de 480 ms y TTI de 6,1 s**. Es el costo del
+paquete de JavaScript: 514 KB que el teléfono tiene que descargar, analizar y ejecutar
+antes de que la pantalla responda al primer toque. En un gama media real se siente como
+"se ve pero no reacciona". Es el patrón esperable de una SPA de Angular, y la vía de
+mejora es *lazy loading* por ruta: hoy el portal del cliente arrastra código del panel
+de administración que nunca va a usar.
+
+**SEO 75** es el puntaje más bajo, pero **no es relevante acá**: es una aplicación tras
+inicio de sesión, no un sitio que deba posicionar en buscadores. Se reporta por
+completitud, no como un problema a corregir.
+
+**Relación con el hallazgo 2.** Esta medición se tomó en `/portal/login`, que no carga
+promociones. La pantalla de ofertas sí las carga: antes de la corrección habría sumado
+varios MB sobre estos 1 180 KB, en el dispositivo con menos margen. El impacto real de
+esa corrección se ve mejor aquí que en los milisegundos de la prueba de carga local.
+
+---
+
 ## 7. Limitaciones y trabajo pendiente
 
 Lo que este informe **no** demuestra, dicho explícitamente:
@@ -217,8 +268,10 @@ Lo que este informe **no** demuestra, dicho explícitamente:
    cuesta. Es la razón por la que el hallazgo 2 se ve modesto en milisegundos pese a
    ser 528× menos tráfico. Una medición contra el entorno desplegado daría números
    peores y más realistas.
-2. **No se midió el frontend.** Falta Lighthouse (LCP, CLS, INP, tamaño del paquete) y
-   WebPageTest con red 3G/4G simulada.
+2. **El frontend se midió solo en `/portal/login`.** Falta medir las pantallas con
+   datos cargados (ofertas, mis citas), que son las que traen contenido pesado. Tampoco
+   se usó WebPageTest ni se midió **INP**, que necesita interacción real del usuario y
+   no lo reporta un análisis de laboratorio.
 3. **El escalón de 800 usuarios quedó parcial**: la exportación de datos crudos frenó
    al generador y no completó ese tramo. Los escalones hasta 400 sí son completos.
 4. **La máquina de prueba tiene 18 núcleos**; el contenedor de producción tiene una
@@ -235,12 +288,20 @@ Lo que este informe **no** demuestra, dicho explícitamente:
 3. **Store compartido (Redis) para el limitador de tasa** antes de escalar a varias
    instancias: hoy es por proceso y el cupo efectivo se multiplica.
 4. **Paginación estricta** en los listados globales, que hoy tienen un tope de 500 filas.
+5. **Carga diferida por ruta en el frontend.** Son 514 KB de JavaScript en la carga
+   inicial y un TBT de 480 ms en móvil: el portal del cliente arrastra código del panel
+   de administración que nunca va a usar. Es la mayor mejora pendiente de cara a las
+   tiendas de aplicaciones, donde el objetivo es un teléfono de gama media.
 
 ---
 
 ## Cómo reproducir
 
 ```bash
+# 0. Frontend (Core Web Vitals)
+npx lighthouse <url>/portal/login --preset=desktop --output=html --output-path=lh.html
+npx lighthouse <url>/portal/login --output=html --output-path=lh-movil.html   # movil + red simulada
+
 # 1. Base de pruebas
 node backend/src/db/migrate.js                     # con MYSQL_URL apuntando a la base local
 node backend/scripts/seed-carga.js "mysql://root@127.0.0.1:3307/taller_pruebas"
