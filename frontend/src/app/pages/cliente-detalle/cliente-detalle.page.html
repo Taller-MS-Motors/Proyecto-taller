@@ -120,6 +120,14 @@
       </ion-item>
     </ion-list>
   </ion-card>
+
+  <!-- Zona de riesgo: al final, separada del resto, para no borrar por accidente -->
+  <ion-button expand="block" fill="outline" color="danger" class="ion-margin"
+              (click)="eliminarCliente()">
+    <ion-icon name="trash-outline" slot="start"></ion-icon>
+    Eliminar cliente
+  </ion-button>
+  <div style="height:24px"></div>
 </ion-content>
 
 <ion-content *ngIf="cargando">

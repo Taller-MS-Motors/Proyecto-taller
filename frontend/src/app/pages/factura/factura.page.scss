@@ -86,6 +86,10 @@
 .fac-totales {
   margin-left: auto;
   width: 280px;
+  // En pantallas de 320px la hoja deja ~256px de contenido: sin este tope el
+  // bloque de totales se salía y cortaba los montos. En pantallas normales
+  // sigue midiendo los 280px de siempre.
+  max-width: 100%;
 
   div {
     display: flex;

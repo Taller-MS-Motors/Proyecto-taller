@@ -48,6 +48,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  // Los <input type="time"> no bajan de ~95px por más que se los apriete: entre la
+  // etiqueta del día, las dos horas y "Abierto" la fila pedía ~400px y en un
+  // teléfono se salía de la tarjeta (cortando "Abierto" y desbordando la página).
+  flex-wrap: wrap;
   padding: 8px;
   background: var(--sur2);
   border-radius: 10px;
@@ -68,6 +72,9 @@
   width: 84px;
   font-weight: 700;
   font-size: 12px;
+  // En pantallas angostas el día ocupa su propia línea y las horas quedan
+  // ordenadas debajo, en vez de envolver de forma despareja.
+  @media (max-width: 420px) { width: 100%; }
 }
 
 // Time inputs inside schedule rows
