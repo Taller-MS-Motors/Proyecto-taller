@@ -16,10 +16,19 @@
 const cluster = require('cluster');
 const os = require('os');
 
-// Cuántos workers. Por defecto uno por núcleo, con tope de 4: más allá de eso la
-// base y la memoria del contenedor pesan más que el paralelismo ganado.
+// Cuántos workers.
+//
+// NO se deduce de os.cpus(): dentro de un contenedor eso devuelve los núcleos del
+// HOST, no lo que la plataforma te asignó. En una caja de 18 núcleos con un
+// contenedor de 0,5 vCPU y 512 MB, levantar 18 (o 4) procesos empeora las cosas:
+// cada worker de Node arranca en ~60 MB y se pelean por el mismo tiempo de CPU.
+//
+// Por eso el valor se declara: WEB_CONCURRENCY, ajustado al plan contratado.
+// Sin declarar se usan 2, que aprovecha una segunda vCPU si la hay y sigue entrando
+// con holgura en un contenedor chico. Los núcleos del host se muestran solo como
+// referencia al arrancar.
 const CPUS = os.cpus().length;
-const WORKERS = Math.max(1, Math.min(Number(process.env.WEB_CONCURRENCY) || CPUS, 4));
+const WORKERS = Math.max(1, Math.min(Number(process.env.WEB_CONCURRENCY) || 2, 8));
 
 if (!cluster.isPrimary || WORKERS === 1) {
   // Un solo worker no justifica el primario: se arranca directo y se ahorra un proceso.
@@ -29,7 +38,7 @@ if (!cluster.isPrimary || WORKERS === 1) {
   const { ensureSchema } = require('./db/auto-migrate');
 
   (async () => {
-    console.log(`🧵 Multiproceso: ${WORKERS} workers (${CPUS} núcleos disponibles)`);
+    console.log(`🧵 Multiproceso: ${WORKERS} workers (WEB_CONCURRENCY${process.env.WEB_CONCURRENCY ? '' : ' sin definir → 2'}; el host reporta ${CPUS} núcleos, que en un contenedor NO es lo asignado)`);
     await testConnection();
     await ensureSchema();   // una sola vez, antes de que nadie acepte requests
 
