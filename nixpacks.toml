@@ -13,4 +13,4 @@ cmds = [
 ]
 
 [start]
-cmd = "node backend/src/server.js"
+cmd = "node backend/src/cluster.js"
