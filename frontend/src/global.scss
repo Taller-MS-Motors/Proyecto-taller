@@ -1115,3 +1115,51 @@ html { zoom: var(--app-zoom, 1); }
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
   ion-icon { font-size: 16px; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Modal del panel de administración — cáscara reutilizable.
+   Ionic monta el modal en la raíz del DOM, FUERA de .admin-dark, así que los
+   tokens (--sur, --bd, --tx) y las clases del panel (.cd-title, .fg, .btn) no
+   se heredan: hay que volver a poner class="admin-dark" en la raíz de adentro.
+   Sin eso el contenido sale sin ningún estilo.
+   ═══════════════════════════════════════════════════════════ */
+ion-modal.adm-modal {
+  // Alto según contenido: un modal a pantalla completa para un puñado de campos
+  // se ve desproporcionado en escritorio.
+  --width: 92%;
+  --max-width: 520px;
+  --height: auto;
+  --border-radius: 24px;
+  --background: #111111;
+  --box-shadow: 0 20px 60px rgba(0, 0, 0, .55);
+}
+
+.adm-modal-box {
+  background: var(--sur);
+  color: var(--tx);
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+
+  .amb-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 20px 20px 0;
+    .cd-title { margin: 0; }
+    .amb-x {
+      background: none; border: none; color: var(--tx3); cursor: pointer;
+      padding: 4px; line-height: 0; border-radius: 8px;
+      &:hover { color: var(--tx); background: var(--sur2); }
+      ion-icon { font-size: 20px; }
+    }
+  }
+
+  .amb-body { padding: 16px 20px 4px; overflow-y: auto; }
+
+  .amb-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    flex-wrap: wrap; padding: 14px 20px 20px;
+    border-top: 1px solid var(--bd); margin-top: 8px;
+    .amb-tip { font-size: 11px; color: var(--tx3); flex: 1 1 140px; }
+    .amb-btns { display: flex; gap: 8px; margin-left: auto; }
+  }
+}

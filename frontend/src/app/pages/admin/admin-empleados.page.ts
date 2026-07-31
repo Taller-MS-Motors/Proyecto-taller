@@ -10,6 +10,7 @@ import { Usuario } from '../../models/usuario.model';
   standalone: false,
   selector: 'app-admin-empleados',
   templateUrl: './admin-empleados.page.html',
+  styleUrls: ['./admin-empleados.page.scss'],
 })
 export class AdminEmpleadosPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
@@ -26,6 +27,20 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
 
   eliminando: number | null = null;
 
+  // Abajo de 860px el .g2 deja de ser de dos columnas y el formulario pasa a
+  // empujar la lista fuera de la pantalla; ahí se convierte en modal. El mismo
+  // umbral que usa el layout, para que no haya un tramo con las dos cosas mal.
+  private static readonly MOVIL = '(max-width: 859.98px)';
+  private mq: MediaQueryList | null = null;
+  private onMq = (e: MediaQueryListEvent | MediaQueryList) => {
+    this.esMovil = e.matches;
+    // Al ensancharse la ventana el formulario vuelve a la tarjeta: dejar el modal
+    // abierto lo mostraría dos veces.
+    if (!this.esMovil) this.modalAbierto = false;
+  };
+  esMovil = false;
+  modalAbierto = false;
+
   constructor(
     private svc: UsuariosService,
     private admin: AdminService,
@@ -33,8 +48,17 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
     private alert: AlertController,
   ) {}
 
-  ngOnInit() { this.cargar(); this.cargarSucursales(); }
+  ngOnInit() {
+    this.mq = window.matchMedia(AdminEmpleadosPage.MOVIL);
+    this.esMovil = this.mq.matches;
+    this.mq.addEventListener('change', this.onMq);
+    this.cargar();
+    this.cargarSucursales();
+  }
   ionViewWillEnter() { this.cargar(); }
+
+  abrirModal() { this.modalAbierto = true; }
+  cerrarModal() { this.modalAbierto = false; }
 
   cargar() {
     this.cargando = true;
@@ -86,6 +110,7 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
       next: () => {
         this.creando = false;
         this.nuevo = { nombre: '', email: '', password: '', password2: '', rol: 'tecnico', telefono: '', sucursal_id: null };
+        this.cerrarModal();   // en escritorio no hay modal abierto, así que no molesta
         this.cargar();
         this.aviso('Empleado creado');
       },
@@ -132,7 +157,11 @@ export class AdminEmpleadosPage implements OnInit, OnDestroy {
     this.svc.toggleActivo(u.id!, !u.activo).pipe(takeUntil(this.destroy$)).subscribe({ next: () => { u.activo = u.activo ? 0 : 1; } });
   }
 
-  ngOnDestroy() { this.destroy$.next(); this.destroy$.complete(); }
+  ngOnDestroy() {
+    this.mq?.removeEventListener('change', this.onMq);
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
   iniciales(n?: string): string {
     const p = (n || '?').trim().split(/\s+/);

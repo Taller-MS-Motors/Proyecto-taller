@@ -85,17 +85,17 @@
 
 <!-- El modal se monta fuera de .admin-dark (Ionic lo saca a la raíz del DOM), así que
      la clase se vuelve a aplicar adentro o los tokens del panel no se heredan. -->
-<ion-modal class="tarea-modal" [isOpen]="modalAbierto" (didDismiss)="cerrarModal()">
+<ion-modal class="adm-modal" [isOpen]="modalAbierto" (didDismiss)="cerrarModal()">
   <ng-template>
-    <div class="admin-dark tm">
-      <div class="tm-head">
+    <div class="admin-dark adm-modal-box">
+      <div class="amb-head">
         <span class="cd-title">{{ editandoId ? 'Editar tarea' : 'Asignar nueva tarea' }}</span>
-        <button type="button" class="tm-x" (click)="cerrarModal()" aria-label="Cerrar">
+        <button type="button" class="amb-x" (click)="cerrarModal()" aria-label="Cerrar">
           <ion-icon name="close"></ion-icon>
         </button>
       </div>
 
-      <div class="tm-body">
+      <div class="amb-body">
         <div class="fg">
           <label>Mecánico</label>
           <select [(ngModel)]="form.tecnico_id">
@@ -126,9 +126,9 @@
         </div>
       </div>
 
-      <div class="tm-foot">
-        <span class="tm-tip" *ngIf="!editandoId">El modal queda abierto para cargarle varias seguidas.</span>
-        <div class="tm-btns">
+      <div class="amb-foot">
+        <span class="amb-tip" *ngIf="!editandoId">El modal queda abierto para cargarle varias seguidas.</span>
+        <div class="amb-btns">
           <button type="button" class="btn" (click)="cerrarModal()">{{ editandoId ? 'Cancelar' : 'Listo' }}</button>
           <button type="button" class="btn btn-cr" (click)="guardar()" [disabled]="guardando">
             <ng-container *ngIf="editandoId">{{ guardando ? 'Guardando…' : 'Guardar cambios' }}</ng-container>

@@ -6,48 +6,62 @@
   </ion-toolbar>
 </ion-header>
 
+<!-- El formulario se escribe UNA vez y se proyecta donde haga falta: en escritorio
+     va en su tarjeta al lado de la lista; en celular, dentro del modal. -->
+<ng-template #formEmpleado>
+  <div class="fg"><label>Nombre completo *</label><input [(ngModel)]="nuevo.nombre" placeholder="Ej: Carlos García"></div>
+  <div class="fg"><label>Correo electrónico *</label><input type="email" [(ngModel)]="nuevo.email" placeholder="carlos@taller.com"></div>
+  <div class="fg">
+    <label>Contraseña *</label>
+    <div class="pass-wrap">
+      <input [type]="verPass ? 'text' : 'password'" [(ngModel)]="nuevo.password" placeholder="Mín. 6 caracteres">
+      <button type="button" class="pass-eye" (click)="verPass = !verPass"
+              [attr.aria-label]="verPass ? 'Ocultar contraseña' : 'Ver contraseña'">
+        <ion-icon [name]="verPass ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+      </button>
+    </div>
+  </div>
+  <div class="fg">
+    <label>Confirmar contraseña *</label>
+    <input [type]="verPass ? 'text' : 'password'" [(ngModel)]="nuevo.password2" placeholder="Repetí la contraseña">
+    <div class="hint hint-error" *ngIf="nuevo.password2 && !passCoincide">Las contraseñas no coinciden</div>
+  </div>
+  <div class="fg"><label>Teléfono (opcional)</label><input type="tel" [(ngModel)]="nuevo.telefono" placeholder="8888-8888"></div>
+  <div class="fg"><label>Rol *</label>
+    <select [(ngModel)]="nuevo.rol">
+      <option value="tecnico">Mecánico</option>
+      <option value="recepcion">Recepcionista</option>
+    </select>
+  </div>
+  <div class="fg" *ngIf="sucursales.length"><label>Sucursal</label>
+    <select [(ngModel)]="nuevo.sucursal_id">
+      <option [ngValue]="null">Ambas / sin asignar</option>
+      <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
+    </select>
+  </div>
+</ng-template>
+
 <ion-content class="admin-dark">
   <div class="admin">
     <div class="g2">
-      <!-- Crear empleado -->
-      <div class="cd">
+      <!-- Crear empleado: en escritorio, en su tarjeta junto a la lista (a partir de
+           860px el .g2 pone las dos columnas y hay sitio de sobra). -->
+      <div class="cd" *ngIf="!esMovil">
         <span class="cd-title">Crear nuevo empleado</span>
-        <div class="fg"><label>Nombre completo *</label><input [(ngModel)]="nuevo.nombre" placeholder="Ej: Carlos García"></div>
-        <div class="fg"><label>Correo electrónico *</label><input type="email" [(ngModel)]="nuevo.email" placeholder="carlos@taller.com"></div>
-        <div class="fg">
-          <label>Contraseña *</label>
-          <div style="position:relative">
-            <input [type]="verPass ? 'text' : 'password'" [(ngModel)]="nuevo.password" placeholder="Mín. 6 caracteres" style="width:100%;padding-right:42px">
-            <button type="button" (click)="verPass = !verPass" [attr.aria-label]="verPass ? 'Ocultar contraseña' : 'Ver contraseña'"
-                    style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--tx3);cursor:pointer;display:flex;padding:4px">
-              <ion-icon [name]="verPass ? 'eye-off-outline' : 'eye-outline'" style="font-size:19px"></ion-icon>
-            </button>
-          </div>
-        </div>
-        <div class="fg">
-          <label>Confirmar contraseña *</label>
-          <input [type]="verPass ? 'text' : 'password'" [(ngModel)]="nuevo.password2" placeholder="Repetí la contraseña" style="width:100%">
-          <div class="hint" *ngIf="nuevo.password2 && !passCoincide" style="color:var(--rd)">Las contraseñas no coinciden</div>
-        </div>
-        <div class="fg"><label>Teléfono (opcional)</label><input type="tel" [(ngModel)]="nuevo.telefono" placeholder="8888-8888"></div>
-        <div class="fg"><label>Rol *</label>
-          <select [(ngModel)]="nuevo.rol">
-            <option value="tecnico">Mecánico</option>
-            <option value="recepcion">Recepcionista</option>
-          </select>
-        </div>
-        <div class="fg" *ngIf="sucursales.length"><label>Sucursal</label>
-          <select [(ngModel)]="nuevo.sucursal_id">
-            <option [ngValue]="null">Ambas / sin asignar</option>
-            <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
-          </select>
-        </div>
+        <ng-container *ngTemplateOutlet="formEmpleado"></ng-container>
         <button class="btn btn-cr btn-block" (click)="crear()" [disabled]="!valido || creando">{{ creando ? 'Creando…' : 'Crear empleado' }}</button>
       </div>
 
       <!-- Lista de empleados -->
       <div class="cd">
-        <span class="cd-title"><ion-icon name="people-outline"></ion-icon> Empleados</span>
+        <div class="emp-header">
+          <span class="cd-title"><ion-icon name="people-outline"></ion-icon> Empleados</span>
+          <!-- En celular el formulario ocupaba toda la pantalla y empujaba la lista
+               fuera de la vista; acá se abre bajo demanda. -->
+          <button class="btn btn-cr btn-sm nuevo-cta" *ngIf="esMovil" (click)="abrirModal()">
+            <ion-icon name="add"></ion-icon> Nuevo empleado
+          </button>
+        </div>
         <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:8px">
           <div class="sk-dark" style="height:62px"></div>
           <div class="sk-dark" style="height:62px"></div>
@@ -60,8 +74,7 @@
               <span>{{ rolLabel[u.rol] || u.rol }}<span *ngIf="u.telefono"> · {{ u.telefono }}</span></span>
               <!-- Sucursal del empleado (el admin no se ata a un local) -->
               <select *ngIf="u.rol !== 'admin' && sucursales.length" class="emp-suc"
-                      [ngModel]="u.sucursal_id ?? null" (ngModelChange)="cambiarSucursal(u, $event)"
-                      style="margin-top:4px;padding:3px 6px;border:1px solid var(--bd);border-radius:6px;background:var(--sur3);color:var(--tx2);font-size:11px;max-width:170px">
+                      [ngModel]="u.sucursal_id ?? null" (ngModelChange)="cambiarSucursal(u, $event)">
                 <option [ngValue]="null">Ambas sucursales</option>
                 <option *ngFor="let s of sucursales" [ngValue]="s.id">{{ s.nombre }}</option>
               </select>
@@ -81,3 +94,28 @@
     </div>
   </div>
 </ion-content>
+
+<!-- Solo en celular. Ionic lo monta fuera de .admin-dark, de ahí la clase repetida. -->
+<ion-modal class="adm-modal" [isOpen]="modalAbierto" (didDismiss)="cerrarModal()">
+  <ng-template>
+    <div class="admin-dark adm-modal-box">
+      <div class="amb-head">
+        <span class="cd-title">Crear nuevo empleado</span>
+        <button type="button" class="amb-x" (click)="cerrarModal()" aria-label="Cerrar">
+          <ion-icon name="close"></ion-icon>
+        </button>
+      </div>
+      <div class="amb-body">
+        <ng-container *ngTemplateOutlet="formEmpleado"></ng-container>
+      </div>
+      <div class="amb-foot">
+        <div class="amb-btns">
+          <button type="button" class="btn" (click)="cerrarModal()">Cancelar</button>
+          <button type="button" class="btn btn-cr" (click)="crear()" [disabled]="!valido || creando">
+            {{ creando ? 'Creando…' : 'Crear empleado' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>

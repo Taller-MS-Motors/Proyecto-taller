@@ -1,0 +1,63 @@
+// ────────────────────────────────────────────────
+// Admin Empleados — component-scoped styles
+// Hereda los tokens (--sur, --bd, --tx…) de .admin-dark global.
+// La cáscara del modal (.adm-modal / .adm-modal-box) es compartida y vive en
+// global.scss, porque la usan también otras pantallas del panel.
+// ────────────────────────────────────────────────
+
+.emp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+
+  .cd-title { margin: 0; }
+}
+
+.nuevo-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  ion-icon { font-size: 15px; }
+}
+
+// Campo de contraseña con el ojo para mostrarla.
+.pass-wrap {
+  position: relative;
+
+  input { width: 100%; padding-right: 42px; }
+
+  .pass-eye {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: 0;
+    color: var(--tx3);
+    cursor: pointer;
+    display: flex;
+    padding: 4px;
+
+    &:hover { color: var(--tx2); }
+    ion-icon { font-size: 19px; }
+  }
+}
+
+.hint-error {
+  color: var(--rd);
+}
+
+// Selector de sucursal dentro de la fila del empleado.
+.emp-suc {
+  margin-top: 4px;
+  padding: 3px 6px;
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  background: var(--sur3);
+  color: var(--tx2);
+  font-size: 11px;
+  max-width: 170px;
+}
