@@ -422,6 +422,49 @@ async function ensureSchema() {
       pool.query("INSERT IGNORE INTO sucursales (id, nombre, orden) VALUES (1, 'Liberia', 1), (2, 'Cañas', 2)")
     );
 
+    // Catálogo de servicios editable desde el panel. Antes vivía hardcodeado en
+    // utils/servicios.js (portal) y, con otros nombres, en el formulario de recepción.
+    // `citas.tipo_servicio` sigue guardando el TEXTO, no un id: así renombrar o borrar
+    // un servicio no reescribe ni rompe el historial ya agendado.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS servicios (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        nombre     VARCHAR(120) NOT NULL,
+        activo     TINYINT(1) NOT NULL DEFAULT 1,
+        orden      INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_servicio_nombre (nombre)
+      )
+    `);
+    // Semilla con los dos catálogos que estaban dispersos, unificados. Sin esto, al
+    // desplegar el portal se quedaría sin nada que ofrecer. INSERT IGNORE + UNIQUE
+    // lo hace idempotente y respeta cualquier edición posterior del taller.
+    await tryStep('seed servicios', () =>
+      pool.query(
+        `INSERT IGNORE INTO servicios (nombre, orden) VALUES
+           ('Cambio de aceite y filtros', 1),
+           ('Revisión completa', 2),
+           ('Cambio de pastillas de freno', 3),
+           ('Kit de transmisión (cadena y piñones)', 4),
+           ('Diagnóstico electrónico', 5),
+           ('Cambio de neumáticos', 6),
+           ('Mantenimiento preventivo', 7),
+           ('Sistema eléctrico', 8),
+           ('Afinamiento', 9),
+           ('Otro', 99)`
+      )
+    );
+    // Los servicios que ya se usaron en citas pero no están en la semilla (nombres
+    // viejos del formulario de recepción) se incorporan para no perder trazabilidad.
+    await tryStep('incorporar servicios historicos', () =>
+      pool.query(
+        `INSERT IGNORE INTO servicios (nombre, orden)
+         SELECT DISTINCT TRIM(tipo_servicio), 50 FROM citas
+         WHERE tipo_servicio IS NOT NULL AND TRIM(tipo_servicio) <> ''`
+      )
+    );
+
     // Columna sucursal_id (sin FK aquí, igual que citas.tecnico_id/orden_id; las FK van
     // solo en schema.sql para instalación limpia). NULL en usuarios = "atiende ambas".
     await addColumnIfMissing('citas', 'sucursal_id', 'INT NULL');

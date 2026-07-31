@@ -4,7 +4,7 @@ import { LoadingController, ToastController } from '@ionic/angular';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PortalService } from '../../services/portal.service';
-import { SERVICIOS, HORAS } from '../../utils/servicios';
+import { HORAS } from '../../utils/servicios';
 import { ahoraTaller } from '../../utils/fecha-cita';
 
 @Component({
@@ -15,7 +15,7 @@ import { ahoraTaller } from '../../utils/fecha-cita';
 })
 export class PortalAgendarPage implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
-  readonly servicios = SERVICIOS;
+  servicios: string[] = [];
   readonly horas = HORAS;
   motos: any[] = [];
   sucursales: any[] = [];
@@ -42,6 +42,7 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.cargarMotos();
+    this.cargarServicios();
     this.cargarSucursales();
     const id = this.route.snapshot.paramMap.get('id');
     if (id) { this.cargarParaEditar(+id); return; }
@@ -52,13 +53,31 @@ export class PortalAgendarPage implements OnInit, OnDestroy {
   }
   ionViewWillEnter() { this.cargarMotos(); }
 
+  // Las dos cargas son asíncronas y el prefill necesita ambas, así que cada una avisa
+  // al llegar y el prefill se aplica cuando ya están las dos. Sin esto, si las motos
+  // llegaban antes que los servicios, el servicio sugerido se perdía en silencio.
+  private motosListas = false;
+  private serviciosListos = false;
+
   cargarMotos() {
-    this.portal.getMotos().pipe(takeUntil(this.destroy$)).subscribe(r => { this.motos = r.data; this.aplicarPrefill(); });
+    this.portal.getMotos().pipe(takeUntil(this.destroy$)).subscribe(r => {
+      this.motos = r.data;
+      this.motosListas = true;
+      this.aplicarPrefill();
+    });
+  }
+
+  cargarServicios() {
+    this.portal.getServicios().pipe(takeUntil(this.destroy$)).subscribe({
+      next: r => { this.servicios = r.data || []; this.serviciosListos = true; this.aplicarPrefill(); },
+      error: () => { this.serviciosListos = true; this.aplicarPrefill(); },
+    });
   }
 
   // Precarga moto + servicio sugeridos (validados contra los datos reales), una sola vez.
   private aplicarPrefill() {
     if (!this.prefill || this.editId) return;
+    if (!this.motosListas || !this.serviciosListos) return;
     if (this.prefill.moto && this.motos.some(m => m.id === this.prefill!.moto)) this.form.moto_id = this.prefill.moto;
     if (this.prefill.servicio && this.servicios.includes(this.prefill.servicio)) this.form.tipo_servicio = this.prefill.servicio;
     this.prefill = null;

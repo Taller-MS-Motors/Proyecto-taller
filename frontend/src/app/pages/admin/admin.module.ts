@@ -11,6 +11,7 @@ import { AdminOpinionesPage } from './admin-opiniones.page';
 import { AdminPromosPage } from './admin-promos.page';
 import { AdminCalendarioPage } from './admin-calendario.page';
 import { AdminConfigPage } from './admin-config.page';
+import { AdminServiciosPage } from './admin-servicios.page';
 import { AdminMensajesPage } from './admin-mensajes.page';
 import { AdminPerfilPage } from './admin-perfil.page';
 import { AdminActionsComponent } from './admin-actions.component';
@@ -28,6 +29,7 @@ import { AdminActionsComponent } from './admin-actions.component';
     AdminPromosPage,
     AdminCalendarioPage,
     AdminConfigPage,
+    AdminServiciosPage,
     AdminMensajesPage,
     AdminPerfilPage,
     AdminActionsComponent,

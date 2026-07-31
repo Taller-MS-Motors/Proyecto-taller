@@ -7,7 +7,7 @@ const requireRol = require('../middleware/roles');
 const { soloRoles } = require('../middleware/roles');
 const { generarNumeroOrden, sincronizarCitaDesdeOrden, cerrarOrden, avanzarEstadoOrden, estadoTrasAprobacion } = require('../utils/ordenes');
 const { getConfig, horasDisponibles } = require('../utils/configuracion');
-const { SERVICIOS } = require('../utils/servicios');
+const { getServicios } = require('../utils/servicios');
 const { getSucursales, tecnicoEnSucursal } = require('../utils/sucursales');
 const { notificarMecanico } = require('../utils/notificaciones');
 const { LEIDO_POR_MI, VISTO_POR_OTRO, marcarLeidos } = require('../utils/mensajes');
@@ -653,9 +653,14 @@ router.get('/tecnicos', async (req, res) => {
   }
 });
 
-// Catálogo de servicios (para el formulario de agendar).
-router.get('/servicios', (req, res) => {
-  res.json({ data: SERVICIOS });
+// Catálogo de servicios (para el formulario de agendar). Solo los activos: es lo que
+// el taller ofrece hoy. Se administra desde el panel, en Servicios.
+router.get('/servicios', async (req, res) => {
+  try {
+    res.json({ data: await getServicios() });
+  } catch (err) {
+    fail(res, err);
+  }
 });
 
 // Sucursales activas (para elegir local al ingresar un cliente sin cita).

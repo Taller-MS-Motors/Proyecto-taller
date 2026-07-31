@@ -16,7 +16,7 @@ const {
   enviarCodigoCambioCorreo, enviarAvisoCambioCorreo,
 } = require('../services/mailer');
 const { antibot } = require('../utils/antibot');
-const { SERVICIOS } = require('../utils/servicios');
+const { servicioValido, getServicios } = require('../utils/servicios');
 const { getConfig, horasDisponibles } = require('../utils/configuracion');
 const { getSucursales, sucursalValida, sucursalPorDefecto } = require('../utils/sucursales');
 const { avanzarEstadoOrden, estadoTrasAprobacion } = require('../utils/ordenes');
@@ -828,6 +828,17 @@ router.get('/sucursales', async (req, res) => {
   }
 });
 
+// GET /api/portal/servicios — lo que el cliente puede elegir al agendar. Se sirve desde
+// la base para que coincida siempre con lo que valida POST /citas: antes el catálogo
+// estaba copiado en el frontend y podía quedar desfasado del que exige el servidor.
+router.get('/servicios', async (req, res) => {
+  try {
+    res.json({ data: await getServicios() });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 // GET /api/portal/disponibilidad?fecha=&sucursal_id= — conteo de citas por hora ese día
 // y sucursal. El horario es compartido (config), pero el cupo se cuenta POR sucursal:
 // una cita en un local no ocupa el cupo del otro.
@@ -1256,7 +1267,7 @@ router.put('/citas/:id', async (req, res) => {
     if (!moto_id || !fecha || !hora || !tipo_servicio) {
       return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
     }
-    if (!SERVICIOS.includes(tipo_servicio)) {
+    if (!(await servicioValido(tipo_servicio))) {
       return res.status(400).json({ error: 'Servicio no válido' });
     }
     // Sucursal: la pedida (si es válida) o se conserva la actual de la cita más abajo.
@@ -1345,7 +1356,7 @@ router.post('/citas', async (req, res) => {
     if (!moto_id || !fecha || !hora || !tipo_servicio) {
       return res.status(400).json({ error: 'Moto, servicio, fecha y hora son requeridos' });
     }
-    if (!SERVICIOS.includes(tipo_servicio)) {
+    if (!(await servicioValido(tipo_servicio))) {
       return res.status(400).json({ error: 'Servicio no válido' });
     }
     // Sucursal obligatoria y válida (activa). El cupo se controla por sucursal.

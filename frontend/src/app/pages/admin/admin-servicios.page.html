@@ -1,0 +1,106 @@
+<ion-header>
+  <ion-toolbar class="admin-topbar">
+    <ion-buttons slot="start"><ion-menu-button></ion-menu-button></ion-buttons>
+    <ion-title>Servicios</ion-title>
+    <app-admin-actions slot="end"></app-admin-actions>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="admin-dark">
+  <ion-refresher slot="fixed" (ionRefresh)="cargar($event)"><ion-refresher-content></ion-refresher-content></ion-refresher>
+
+  <div class="admin">
+    <div class="cd">
+      <div class="srv-header">
+        <span class="cd-title"><ion-icon name="construct-outline"></ion-icon> Catálogo de servicios</span>
+        <button class="btn btn-cr btn-sm nuevo-cta" (click)="abrirModal()">
+          <ion-icon name="add"></ion-icon> Nuevo servicio
+        </button>
+      </div>
+
+      <p class="srv-intro">
+        Es lo que el cliente puede elegir al agendar desde el portal, y lo que ofrece
+        recepción al crear una cita.
+      </p>
+
+      <div class="srv-tools">
+        <div class="buscador">
+          <ion-icon name="search-outline" class="bs-lupa"></ion-icon>
+          <input type="text" [(ngModel)]="busqueda" placeholder="Buscar servicio…">
+          <button type="button" class="bs-x" *ngIf="busqueda" (click)="busqueda = ''" aria-label="Limpiar búsqueda">
+            <ion-icon name="close-circle"></ion-icon>
+          </button>
+        </div>
+      </div>
+
+      <div class="srv-progress" *ngIf="servicios.length">
+        {{ activos }} de {{ servicios.length }} se están ofreciendo
+      </div>
+
+      <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:8px">
+        <div class="sk-dark" style="height:56px"></div>
+        <div class="sk-dark" style="height:56px"></div>
+        <div class="sk-dark" style="height:56px"></div>
+      </div>
+
+      <div *ngIf="!cargando">
+        <div class="srv-row" *ngFor="let s of filtrados" [class.inactivo]="!s.activo">
+          <div class="srv-info">
+            <strong>{{ s.nombre }}</strong>
+            <span class="bg" [ngClass]="s.activo ? 'bg-em' : 'bg-n'">{{ s.activo ? 'Se ofrece' : 'Oculto' }}</span>
+          </div>
+          <div class="srv-actions">
+            <button class="btn btn-sm" (click)="abrirEdicion(s)">Renombrar</button>
+            <button class="btn btn-sm" [ngClass]="s.activo ? 'btn-rd' : 'btn-em'" (click)="toggle(s)">
+              {{ s.activo ? 'Dejar de ofrecer' : 'Ofrecer' }}
+            </button>
+            <button class="btn btn-sm btn-ou" (click)="borrar(s)" title="Eliminar" aria-label="Eliminar servicio">
+              <ion-icon name="trash-outline"></ion-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="empty" *ngIf="!filtrados.length">
+          <ion-icon [name]="filtrando ? 'search-outline' : 'construct-outline'"></ion-icon>
+          <p *ngIf="filtrando">Ningún servicio coincide con «{{ busqueda }}».</p>
+          <p *ngIf="!filtrando">Todavía no hay servicios. Creá el primero para que se pueda agendar.</p>
+          <button type="button" class="btn btn-sm empty-accion" *ngIf="filtrando" (click)="busqueda = ''">Limpiar búsqueda</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</ion-content>
+
+<!-- Ionic monta el modal fuera de .admin-dark: de ahí la clase repetida adentro. -->
+<ion-modal class="adm-modal" [isOpen]="modalAbierto" (didDismiss)="cerrarModal()">
+  <ng-template>
+    <div class="admin-dark adm-modal-box">
+      <div class="amb-head">
+        <span class="cd-title">{{ editandoId ? 'Renombrar servicio' : 'Nuevo servicio' }}</span>
+        <button type="button" class="amb-x" (click)="cerrarModal()" aria-label="Cerrar">
+          <ion-icon name="close"></ion-icon>
+        </button>
+      </div>
+
+      <div class="amb-body">
+        <div class="fg">
+          <label>Nombre del servicio</label>
+          <input type="text" maxlength="120" [(ngModel)]="nombre"
+                 placeholder="Ej: Cambio de bujías" (keyup.enter)="guardar()">
+          <div class="hint" *ngIf="editandoId">
+            Las citas ya agendadas conservan el nombre anterior: renombrar no reescribe el historial.
+          </div>
+        </div>
+      </div>
+
+      <div class="amb-foot">
+        <div class="amb-btns">
+          <button type="button" class="btn" (click)="cerrarModal()">Cancelar</button>
+          <button type="button" class="btn btn-cr" (click)="guardar()" [disabled]="guardando">
+            {{ guardando ? 'Guardando…' : (editandoId ? 'Guardar' : 'Crear servicio') }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>

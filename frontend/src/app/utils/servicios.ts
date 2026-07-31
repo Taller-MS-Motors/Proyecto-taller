@@ -1,12 +1,9 @@
-// Catálogo de servicios y estados de cita (frontend). Debe coincidir con backend/src/utils/servicios.js.
-export const SERVICIOS = [
-  'Cambio de aceite y filtros',
-  'Revisión completa',
-  'Cambio de pastillas de freno',
-  'Kit de transmisión (cadena y piñones)',
-  'Diagnóstico electrónico',
-  'Cambio de neumáticos',
-];
+// Estados de cita y horas de agenda (frontend).
+//
+// El catálogo de servicios ya NO vive acá: se administra desde el panel (Servicios) y
+// se pide al servidor. Tenerlo duplicado hacía que el frontend ofreciera una lista y
+// el backend validara contra otra, y encima el formulario de recepción tenía una
+// tercera con nombres distintos.
 
 export const HORAS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
 

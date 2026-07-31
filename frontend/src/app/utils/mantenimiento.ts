@@ -3,7 +3,10 @@
 // estima a partir de la fecha del último servicio de cada tipo. El km de la moto se
 // muestra como dato, no se usa para calcular.
 
-// Meses recomendados entre servicios del mismo tipo (claves = SERVICIOS de servicios.ts).
+// Meses recomendados entre servicios del mismo tipo. Las claves son nombres del
+// catálogo (hoy editable desde el panel): un servicio que no figure acá simplemente no
+// genera recomendación — se lo saltea más abajo y, si no queda ninguno, cae al base.
+// Se prefiere no sugerir nada antes que inventar un intervalo.
 export const INTERVALOS_MESES: Record<string, number> = {
   'Cambio de aceite y filtros': 4,
   'Revisión completa': 12,

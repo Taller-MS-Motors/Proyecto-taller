@@ -43,6 +43,23 @@ export class AdminService {
     return this.http.get<{ data: any }>(`${this.url}/reportes`, { params });
   }
 
+  // Catálogo de servicios (lo que el taller ofrece agendar).
+  getServicios(): Observable<{ data: { id: number; nombre: string; activo: number; orden: number }[] }> {
+    return this.http.get<{ data: any[] }>(`${this.url}/servicios`);
+  }
+  crearServicio(nombre: string): Observable<{ data: any }> {
+    return this.http.post<{ data: any }>(`${this.url}/servicios`, { nombre });
+  }
+  editarServicio(id: number, nombre: string): Observable<{ data: any }> {
+    return this.http.put<{ data: any }>(`${this.url}/servicios/${id}`, { nombre });
+  }
+  toggleServicio(id: number, activo: boolean): Observable<{ data: any }> {
+    return this.http.patch<{ data: any }>(`${this.url}/servicios/${id}/activo`, { activo });
+  }
+  borrarServicio(id: number): Observable<any> {
+    return this.http.delete(`${this.url}/servicios/${id}`);
+  }
+
   // Asignar tareas a los mecánicos.
   getTareas(empleado?: number | null): Observable<{ data: any[] }> {
     const params: any = {};

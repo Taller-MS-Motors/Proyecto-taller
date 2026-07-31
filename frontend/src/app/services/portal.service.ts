@@ -293,6 +293,12 @@ export class PortalService {
     return this.http.get<{ data: any[] }>(`${this.url}/recompensas`);
   }
 
+  // Catálogo de servicios agendables. Viene del servidor (y no de una copia en el
+  // frontend) para que sea exactamente el mismo contra el que se valida la cita.
+  getServicios(): Observable<{ data: string[] }> {
+    return this.http.get<{ data: string[] }>(`${this.url}/servicios`);
+  }
+
   // —— Perfil (Mi cuenta + Seguridad) ——
   getMiPerfil(): Observable<{ data: any }> {
     return this.http.get<{ data: any }>(`${this.url}/perfil`);

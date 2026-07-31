@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const requireRol = require('../middleware/roles');
 const { getConfig, clearCache } = require('../utils/configuracion');
 const { getSucursales, clearCache: clearSucursalesCache } = require('../utils/sucursales');
+const { getServiciosFilas, clearCache: clearServicios } = require('../utils/servicios');
 const { fotoValida, textoDentroDeLimite } = require('../utils/validar');
 
 // Panel del administrador: métricas ejecutivas. Solo admin.
@@ -389,6 +390,106 @@ router.delete('/tareas/:id', async (req, res) => {
   try {
     await pool.query('DELETE FROM tareas_mecanico WHERE id = ? AND asignado_por IS NOT NULL', [req.params.id]);
     res.json({ message: 'Tarea eliminada' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// ───────────────────────────────────────────────────────────
+// Catálogo de servicios (lo que se puede agendar).
+// El nombre se guarda como texto en citas.tipo_servicio, así que editar o borrar acá
+// nunca reescribe el historial: las citas viejas conservan el nombre con el que se
+// agendaron. Por eso mismo, desactivar es lo normal y borrar es la excepción.
+// ───────────────────────────────────────────────────────────
+const MAX_SERVICIO = 120;
+
+// GET /api/admin/servicios — catálogo completo, incluidos los desactivados.
+router.get('/servicios', async (req, res) => {
+  try {
+    res.json({ data: await getServiciosFilas() });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+router.post('/servicios', async (req, res) => {
+  try {
+    const nombre = String(req.body.nombre || '').trim();
+    if (!nombre) return res.status(400).json({ error: 'El nombre es requerido' });
+    if (!textoDentroDeLimite(nombre, MAX_SERVICIO)) {
+      return res.status(400).json({ error: `El nombre no puede pasar de ${MAX_SERVICIO} caracteres` });
+    }
+    const [[dup]] = await pool.query('SELECT id FROM servicios WHERE nombre = ?', [nombre]);
+    if (dup) return res.status(409).json({ error: 'Ya existe un servicio con ese nombre' });
+
+    const [[max]] = await pool.query('SELECT COALESCE(MAX(orden), 0) AS m FROM servicios');
+    const [r] = await pool.query('INSERT INTO servicios (nombre, orden) VALUES (?, ?)', [nombre, max.m + 1]);
+    clearServicios();
+    const [[nuevo]] = await pool.query('SELECT id, nombre, activo, orden FROM servicios WHERE id = ?', [r.insertId]);
+    res.status(201).json({ data: nuevo, message: 'Servicio creado' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+router.put('/servicios/:id', async (req, res) => {
+  try {
+    const nombre = String(req.body.nombre || '').trim();
+    if (!nombre) return res.status(400).json({ error: 'El nombre es requerido' });
+    if (!textoDentroDeLimite(nombre, MAX_SERVICIO)) {
+      return res.status(400).json({ error: `El nombre no puede pasar de ${MAX_SERVICIO} caracteres` });
+    }
+    const [[existe]] = await pool.query('SELECT id FROM servicios WHERE id = ?', [req.params.id]);
+    if (!existe) return res.status(404).json({ error: 'Servicio no encontrado' });
+    const [[dup]] = await pool.query('SELECT id FROM servicios WHERE nombre = ? AND id <> ?', [nombre, req.params.id]);
+    if (dup) return res.status(409).json({ error: 'Ya existe un servicio con ese nombre' });
+
+    const activo = req.body.activo === undefined ? undefined : (req.body.activo ? 1 : 0);
+    if (activo === undefined) {
+      await pool.query('UPDATE servicios SET nombre = ? WHERE id = ?', [nombre, req.params.id]);
+    } else {
+      await pool.query('UPDATE servicios SET nombre = ?, activo = ? WHERE id = ?', [nombre, activo, req.params.id]);
+    }
+    clearServicios();
+    const [[actualizado]] = await pool.query('SELECT id, nombre, activo, orden FROM servicios WHERE id = ?', [req.params.id]);
+    res.json({ data: actualizado, message: 'Servicio actualizado' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// PATCH /api/admin/servicios/:id/activo — alternar disponibilidad sin borrar nada.
+router.patch('/servicios/:id/activo', async (req, res) => {
+  try {
+    const [[s]] = await pool.query('SELECT id, activo FROM servicios WHERE id = ?', [req.params.id]);
+    if (!s) return res.status(404).json({ error: 'Servicio no encontrado' });
+    const activo = req.body.activo === undefined ? (s.activo ? 0 : 1) : (req.body.activo ? 1 : 0);
+    await pool.query('UPDATE servicios SET activo = ? WHERE id = ?', [activo, req.params.id]);
+    clearServicios();
+    res.json({ data: { id: Number(req.params.id), activo }, message: activo ? 'Servicio activado' : 'Servicio desactivado' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// DELETE /api/admin/servicios/:id — solo si nunca se usó. Si ya hay citas con ese
+// nombre se rechaza y se sugiere desactivarlo: borrarlo dejaría en los reportes un
+// servicio que ya no se puede volver a ofrecer ni explicar.
+router.delete('/servicios/:id', async (req, res) => {
+  try {
+    const [[s]] = await pool.query('SELECT id, nombre FROM servicios WHERE id = ?', [req.params.id]);
+    if (!s) return res.status(404).json({ error: 'Servicio no encontrado' });
+
+    const [[uso]] = await pool.query('SELECT COUNT(*) AS n FROM citas WHERE tipo_servicio = ?', [s.nombre]);
+    if (uso.n > 0) {
+      return res.status(409).json({
+        error: `No se puede borrar: ${uso.n} cita${uso.n > 1 ? 's' : ''} lo usaron. Desactivalo para dejar de ofrecerlo.`,
+        en_uso: uso.n,
+      });
+    }
+    await pool.query('DELETE FROM servicios WHERE id = ?', [req.params.id]);
+    clearServicios();
+    res.json({ message: 'Servicio eliminado' });
   } catch (err) {
     fail(res, err);
   }

@@ -7,15 +7,11 @@ import { CitasService } from '../../services/citas.service';
 import { ClientesService } from '../../services/clientes.service';
 import { MotosService } from '../../services/motos.service';
 import { DashboardService } from '../../services/dashboard.service';
+import { RecepcionService } from '../../services/recepcion.service';
 import { AuthService } from '../../services/auth.service';
 import { Cita } from '../../models/cita.model';
 import { Cliente } from '../../models/cliente.model';
 import { Moto } from '../../models/moto.model';
-
-const TIPOS_SERVICIO = [
-  'Mantenimiento preventivo', 'Cambio de aceite', 'Frenos', 'Llantas',
-  'Sistema eléctrico', 'Afinamiento', 'Diagnóstico', 'Otro',
-];
 
 @Component({ standalone: false,
   selector: 'app-cita-form',
@@ -35,7 +31,11 @@ export class CitaFormPage implements OnInit, OnDestroy {
   clientes: Cliente[] = [];
   motos: Moto[] = [];
   tecnicos: any[] = [];
-  tiposServicio = TIPOS_SERVICIO;
+  // Catálogo del servidor, el mismo que ve el cliente en el portal. Antes esta
+  // pantalla tenía su propia lista con otros nombres, así que una cita creada acá
+  // no coincidía con ninguna del portal y quedaba fuera de la sugerencia de
+  // mantenimiento (que busca por nombre exacto).
+  tiposServicio: string[] = [];
 
   constructor(
     private route: ActivatedRoute,
@@ -44,12 +44,16 @@ export class CitaFormPage implements OnInit, OnDestroy {
     private clienteSvc: ClientesService,
     private motoSvc: MotosService,
     private dashSvc: DashboardService,
+    private recepcionSvc: RecepcionService,
     public auth: AuthService,
     private loading: LoadingController,
     private toast: ToastController
   ) {}
 
   ngOnInit() {
+    this.recepcionSvc.getServicios().pipe(takeUntil(this.destroy$)).subscribe({
+      next: r => this.tiposServicio = r.data || [],
+    });
     // Lista de técnicos para asignar (solo admin puede).
     if (this.auth.tieneRol('admin')) {
       this.dashSvc.getTecnicos().pipe(takeUntil(this.destroy$)).subscribe({ next: res => this.tecnicos = res.data });
