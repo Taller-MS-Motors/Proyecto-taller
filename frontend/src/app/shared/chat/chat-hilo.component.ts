@@ -23,6 +23,10 @@ export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
 
   mensajes: any[] = [];
   cargando = true;
+  // Fotos ya descargadas, por id de mensaje. Un mensaje enviado no cambia nunca, así
+  // que una vez traída la imagen no se vuelve a pedir: el refresco de cada 12 s solo
+  // busca las de los mensajes nuevos, que normalmente son cero.
+  private fotos = new Map<number, string>();
   texto = '';
   enviando = false;
   fotoPreview: string | null = null;
@@ -65,7 +69,12 @@ export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
     this.cargando = true;
     const src$ = this.esAvisos ? this.msj.getAvisos() : this.msj.getConversacion(this.contacto!.id);
     src$.pipe(takeUntil(this.destroy$)).subscribe({
-      next: (r: any) => { this.mensajes = r.data || []; this.cargando = false; this.scrollAbajo(); },
+      next: (r: any) => {
+        this.mensajes = r.data || [];
+        this.cargando = false;
+        this.pedirFotosNuevas();
+        this.scrollAbajo();
+      },
       error: () => { this.cargando = false; },
     });
   }
@@ -76,9 +85,30 @@ export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
       next: (r: any) => {
         const tenia = this.mensajes.length;
         this.mensajes = r.data || [];
+        this.pedirFotosNuevas();
         if (this.mensajes.length > tenia) this.scrollAbajo();
       },
     });
+  }
+
+  // Descarga solo las fotos que todavía no están en memoria. En un refresco normal
+  // no pide ninguna: por eso el polling pasó de mover megabytes a mover texto.
+  private pedirFotosNuevas() {
+    for (const m of this.mensajes) {
+      if (!m.tiene_foto || this.fotos.has(m.id)) continue;
+      // Se reserva el lugar antes de pedir: si el refresco vuelve a pasar mientras
+      // la petición está en vuelo, no se dispara una segunda igual.
+      this.fotos.set(m.id, '');
+      this.msj.getFotoMensaje(m.id).pipe(takeUntil(this.destroy$)).subscribe({
+        next: r => { this.fotos.set(m.id, r.data); this.scrollAbajo(); },
+        error: () => { this.fotos.delete(m.id); },   // se reintenta en el próximo refresco
+      });
+    }
+  }
+
+  // La foto para pintar en la burbuja: '' mientras viaja, null si el mensaje no tiene.
+  fotoDe(m: any): string | null {
+    return m?.tiene_foto ? (this.fotos.get(m.id) || null) : null;
   }
 
   enviar(textoOverride?: string) {
@@ -90,6 +120,9 @@ export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
     const req$ = this.esAvisos ? this.msj.enviarAviso(txt, foto) : this.msj.enviar(this.contacto!.id, txt, foto);
     req$.pipe(takeUntil(this.destroy$)).subscribe({
       next: r => {
+        // La imagen que acabo de mandar ya está acá: se siembra en la caché en vez de
+        // volver a bajarla del servidor, así aparece al instante y sin tráfico extra.
+        if (foto && r.data?.id) this.fotos.set(r.data.id, foto);
         this.mensajes.push(r.data);
         this.texto = '';
         this.fotoPreview = null;

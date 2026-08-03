@@ -253,6 +253,15 @@ async function ensureSchema() {
     // bloqueo de rango (FOR UPDATE) del control de cupo sea preciso.
     await crearIndiceSiFalta('citas', 'idx_citas_fecha_hora', '(fecha, hora)');
 
+    // Chat interno: las consultas filtran por el PAR (remitente + destino) y ordenan
+    // por fecha, pero la tabla solo tenía índices de una columna, así que MySQL entraba
+    // por uno y filtraba y ordenaba el resto en memoria. Van los dos sentidos porque
+    // una conversación se busca como A→B y como B→A.
+    await crearIndiceSiFalta('mensajes_internos', 'idx_msg_par', '(remitente_id, destino_id, created_at)');
+    await crearIndiceSiFalta('mensajes_internos', 'idx_msg_par_inv', '(destino_id, remitente_id, created_at)');
+    // Los avisos (broadcast) se filtran por rol y se ordenan por fecha.
+    await crearIndiceSiFalta('mensajes_internos', 'idx_msg_broadcast', '(tipo, destino_rol, created_at)');
+
     // Placa única a nivel de base (no solo en la app). Columna generada normalizada
     // (sin espacios/guiones, mayúsculas) + índice único. Se guarda cada paso por
     // separado para que, si hay placas duplicadas heredadas, el índice falle sin

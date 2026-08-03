@@ -15,8 +15,14 @@ const { fotoValida } = require('../utils/validar');
 router.use(auth, requireRol('recepcion'));
 
 // LEIDO_POR_MI trae un `?` (mi id): va SIEMPRE como primer parámetro del query.
+//
+// La foto NO viaja en el listado, solo si la hay: es MEDIUMTEXT con la imagen en
+// base64 (~100 KB) y el hilo devuelve 200 mensajes, que el frontend además refresca
+// cada 12 s. Se pedía la misma imagen cinco veces por minuto. Se sirve aparte por
+// GET /mensaje/:id/foto y el cliente la cachea por id (un mensaje no cambia nunca).
+// Mismo patrón que ya usaba el listado de promociones.
 const SELECT_MSG = `
-  SELECT m.id, m.mensaje, m.foto, m.orden_id, m.tipo, m.created_at,
+  SELECT m.id, m.mensaje, (m.foto IS NOT NULL) AS tiene_foto, m.orden_id, m.tipo, m.created_at,
          m.remitente_id, m.destino_id,
          ru.nombre AS remitente_nombre, ru.rol AS remitente_rol,
          o.numero_orden,
@@ -176,6 +182,34 @@ router.post('/avisos', soloRoles('recepcion', 'admin'), async (req, res) => {
     );
     const [[nuevo]] = await pool.query(`${SELECT_MSG} WHERE m.id = ?`, [req.usuario.id, r.insertId]);
     res.status(201).json({ data: nuevo, message: 'Aviso enviado a todos los mecánicos' });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// GET /api/mensajeria/mensaje/:id/foto — la imagen de un mensaje, fuera del listado.
+//
+// El control de acceso es el mismo que el del hilo, pero explícito: un id de mensaje
+// es un número correlativo, así que sin esto cualquiera del personal podría recorrer
+// ids y leer las fotos de conversaciones ajenas. Se permite si soy parte del par, o
+// si es un broadcast (que es para todo el personal por definición).
+router.get('/mensaje/:id/foto', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Id inválido' });
+    const yo = req.usuario.id;
+    const [[m]] = await pool.query(
+      'SELECT foto, tipo, remitente_id, destino_id FROM mensajes_internos WHERE id = ?',
+      [id]
+    );
+    if (!m || !m.foto) return res.status(404).json({ error: 'Sin imagen' });
+
+    const esMia = m.remitente_id === yo || m.destino_id === yo;
+    if (m.tipo !== 'broadcast' && !esMia) {
+      // 404 y no 403: un 403 confirmaría que ese mensaje existe.
+      return res.status(404).json({ error: 'Sin imagen' });
+    }
+    res.json({ data: m.foto });
   } catch (err) {
     fail(res, err);
   }

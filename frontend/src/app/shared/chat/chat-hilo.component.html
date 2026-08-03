@@ -44,7 +44,10 @@
           <div class="bubble-order" *ngIf="m.numero_orden" (click)="abrirOrden(m.orden_id)">
             <ion-icon name="document-text-outline"></ion-icon> {{ m.numero_orden }}
           </div>
-          <img *ngIf="m.foto" [src]="m.foto" class="bubble-img" alt="Foto adjunta" />
+          <!-- La imagen ya no viene en el listado: se pide aparte y se cachea por id.
+               Mientras viaja se deja el hueco, para que la burbuja no salte al llegar. -->
+          <div *ngIf="m.tiene_foto && !fotoDe(m)" class="bubble-img-espera skeleton"></div>
+          <img *ngIf="fotoDe(m) as f" [src]="f" class="bubble-img" alt="Foto adjunta" />
           <p *ngIf="m.mensaje">{{ m.mensaje }}</p>
           <span class="b-time">
             {{ horaExacta(m.created_at) }}

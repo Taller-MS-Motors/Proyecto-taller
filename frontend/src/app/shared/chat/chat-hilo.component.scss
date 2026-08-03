@@ -84,6 +84,8 @@
 .bubble-row:not(.mio) + .bubble-row:not(.mio) { margin-top: -2px; }
 
 .bubble-img { max-width: 100%; border-radius: 10px; margin-bottom: 4px; }
+// Hueco mientras la imagen viaja: reserva el alto para que la burbuja no salte al llegar.
+.bubble-img-espera { height: 140px; border-radius: 10px; margin-bottom: 4px; }
 .bubble-quien { font-size: 10.5px; font-weight: 800; color: var(--ion-color-primary); margin-bottom: 2px; }
 .bubble-order { font-size: 10.5px; color: var(--ion-color-primary); font-weight: 600; margin-bottom: 4px; cursor: pointer;
   ion-icon { font-size: 12px; vertical-align: -2px; margin-right: 2px; } }

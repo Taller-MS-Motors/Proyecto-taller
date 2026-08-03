@@ -35,6 +35,13 @@ export class MensajeriaService {
     return this.http.post<{ data: any }>(`${this.url}/conversacion/${usuarioId}`, { mensaje, foto: foto || null });
   }
 
+  // La foto de un mensaje, aparte del listado (que ya no la trae: pesaba ~100 KB y
+  // se repetía en cada refresco de 12 s). La ruta exige sesión, así que no sirve un
+  // <img src> directo: se pide por HTTP y llega la data URL.
+  getFotoMensaje(mensajeId: number): Observable<{ data: string }> {
+    return this.http.get<{ data: string }>(`${this.url}/mensaje/${mensajeId}/foto`);
+  }
+
   getNoLeidos(): Observable<{ data: { count: number } }> {
     return this.http.get<{ data: { count: number } }>(`${this.url}/no-leidos`);
   }
