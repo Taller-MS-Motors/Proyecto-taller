@@ -552,7 +552,8 @@ ion-toast {
 
       p {
         font-size: 11px;
-        color: #737373;
+        // #737373 daba 4,04:1 sobre el fondo oscuro del portal (hace falta 4,5).
+        color: #8A8A8A;
         margin: 0;
         text-transform: uppercase;
         letter-spacing: 0.18em;
@@ -578,7 +579,7 @@ ion-toast {
         --highlight-color-focused: var(--ion-color-primary);
 
         ion-label {
-          color: #737373 !important;
+          color: #8A8A8A !important;   // 4,04:1 -> cumple 4,5:1 en oscuro
           font-size: 11px !important;
           font-weight: 700 !important;
           text-transform: uppercase;
@@ -658,7 +659,11 @@ ion-footer.admin-dark { background: #111111; }
   // semántico en el sistema en modo oscuro), se dejan literales a propósito.
   --sur: #111111; --sur2: #1A1A1A; --sur3: #222222;
   --bd: #2A2A2A; --bd2: #333333;
-  --tx: #F5F5F5; --tx2: #A3A3A3; --tx3: #525252;
+  // --tx3 era #525252: sobre los fondos oscuros de este tema daba un contraste de
+  // 2,2 a 2,5, muy lejos del 4,5 que exige WCAG. Se usa en etiquetas de sección y
+  // textos de apoyo, así que la falla aparecía en TODAS las pantallas del panel.
+  // #8A8A8A es el gris más tenue que supera 4,5:1 contra el fondo más claro (#1a1a1a).
+  --tx: #F5F5F5; --tx2: #A3A3A3; --tx3: #8A8A8A;
   // Acentos y estados: derivados del sistema (una sola fuente de verdad). Se usan
   // los *-tint porque los colores base están pensados para fondo claro y caen bajo
   // AA sobre el panel #111 (p. ej. tertiary base ≈3.2:1); los tint mantienen contraste.
