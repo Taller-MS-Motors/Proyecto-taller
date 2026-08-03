@@ -1,5 +1,6 @@
 import { NgModule } from '@angular/core';
-import { PreloadAllModules, RouterModule, Routes } from '@angular/router';
+import { RouterModule, Routes } from '@angular/router';
+import { PrecargaPorRol } from './shared/precarga-por-rol';
 import { AuthGuard } from './guards/auth.guard';
 import { RolHomeGuard } from './guards/rol-home.guard';
 import { RolGuard } from './guards/rol.guard';
@@ -108,7 +109,10 @@ const routes: Routes = [
 ];
 
 @NgModule({
-  imports: [RouterModule.forRoot(routes, { preloadingStrategy: PreloadAllModules })],
+  // PrecargaPorRol en vez de PreloadAllModules: este descargaba los 83 chunks a todo
+  // el mundo, incluido el cliente del portal, que nunca va a abrir el panel de
+  // administración. Eran 825 KiB de JavaScript sin usar compitiendo con el pintado.
+  imports: [RouterModule.forRoot(routes, { preloadingStrategy: PrecargaPorRol })],
   exports: [RouterModule],
 })
 export class AppRoutingModule {}
