@@ -351,6 +351,93 @@ registradas con su causa exacta para decidirlas.
 
 ---
 
+## 6-ter. Mensajería interna — análisis del techo
+
+El chat quedó fuera de las corridas anteriores. Se analizó su código y se preparó
+[`mensajeria.js`](mensajeria.js) para medirlo. **Los números de abajo son estimaciones
+a partir del código y del tamaño conocido de las fotos, no mediciones**: sirven para
+saber dónde mirar, no para dar por probado el módulo.
+
+### Lo que hace distinto a este módulo
+
+El costo del chat **no depende de cuánto se escriba**, sino de **cuánta gente lo tenga
+abierto**. El frontend refresca solo:
+
+| Componente | Cada | Qué pide |
+|---|---|---|
+| `chat-hilo` | **12 s** | Los últimos **200 mensajes** de la conversación |
+| `chat-contactos` | **15 s** | La lista completa de contactos |
+
+Nadie toca nada y el tráfico ocurre igual. Es el patrón contrario al del resto de la
+aplicación, donde una pantalla se carga cuando alguien entra.
+
+### Riesgo 1 — El hilo devuelve las fotos embebidas (mismo caso que el hallazgo 2)
+
+`SELECT_MSG` incluye `m.foto`, que es **MEDIUMTEXT con la imagen en base64**. La consulta
+del hilo devuelve 200 mensajes con su foto adentro. Con el mismo tamaño de imagen que
+usa el resto del sistema (~100 KB):
+
+| Fotos entre los últimos 200 | Peso por refresco | Por usuario y minuto |
+|---|---|---|
+| 5 | ~0,5 MB | 2,5 MB |
+| 20 (10 %) | **~2 MB** | **10 MB** |
+| 50 (25 %) | ~5 MB | 25 MB |
+
+Con 5 empleados y el chat abierto, el caso del 10 % son **~50 MB/min sostenidos**, o sea
+unos **7 Mbps solo de chat** — sin que nadie escriba un mensaje. Es exactamente el
+problema de las promociones (3 MB por listado) pero repitiéndose **cinco veces por
+minuto y por persona**.
+
+**Corrección análoga a la del hallazgo 2:** que el listado devuelva `tiene_foto` y la
+imagen se pida aparte. Ya es la recomendación 2 del informe; este análisis la cuantifica.
+
+### Riesgo 2 — `/contactos` hace 5 subconsultas correlacionadas por contacto
+
+Para cada empleado de la lista, la consulta resuelve cuatro subconsultas para el último
+mensaje (texto, si es foto, remitente y fecha) más un `COUNT(*)` de no leídos que a su
+vez lleva un `NOT EXISTS` anidado. Son **5 subconsultas × N contactos**, y encima
+ordena por una columna calculada (`ultima_fecha`), lo que obliga a materializar el
+resultado antes de ordenar.
+
+Con 5 empleados no se nota. El costo crece con el **total de mensajes de la tabla**, no
+con los que se ven en pantalla: cada subconsulta recorre `mensajes_internos` buscando el
+par. Y se ejecuta cada 15 s por cada persona con la pantalla abierta.
+
+### Riesgo 3 — Faltan los índices que piden esas consultas
+
+La tabla tiene `idx_msg_remitente(remitente_id)` e `idx_msg_destino(destino_id)`, dos
+índices de **una sola columna**. Las consultas del chat filtran por el **par**
+(`remitente_id` Y `destino_id`), además de `tipo`, y ordenan por `created_at`. Con
+índices de una columna, MySQL entra por una de ellas y filtra y ordena el resto en
+memoria.
+
+**Índice que corresponde:**
+
+```sql
+CREATE INDEX idx_msg_par ON mensajes_internos (remitente_id, destino_id, created_at);
+CREATE INDEX idx_msg_par_inv ON mensajes_internos (destino_id, remitente_id, created_at);
+```
+
+Los dos porque la conversación se consulta en ambos sentidos (`A→B` o `B→A`).
+
+### Estimación del techo, y por qué hay que medirlo
+
+Juntando lo anterior, el límite **no es la cantidad de mensajes almacenados** sino la
+combinación de tres cosas: cuántas personas tienen el chat abierto, cuántas fotos hay
+entre los últimos 200 de cada hilo, y el total de filas de la tabla (que degrada
+`/contactos`).
+
+El orden de magnitud esperable: **el ancho de banda se agota antes que la base**. Con
+20 fotos por hilo y 10 personas con el chat abierto son ~100 MB/min; la base, en cambio,
+aguanta millones de filas si se agregan los índices del riesgo 3.
+
+`mensajeria.js` mide exactamente eso: registra `peso_hilo_kb` y `peso_contactos_kb`
+además de la latencia, porque en este módulo **los milisegundos engañan si no se ve
+cuántos bytes se movieron**. `seed-carga.js` ahora siembra 5 000 mensajes (10 % con
+foto) para que haya volumen que recorrer.
+
+---
+
 ## 7. Limitaciones y trabajo pendiente
 
 Lo que este informe **no** demuestra, dicho explícitamente:
@@ -418,6 +505,7 @@ MYSQL_URL=... WEB_CONCURRENCY=2 RATE_API_MAX=1000000 RATE_AUTH_MAX=1000000 \
 k6 run -e BASE=http://localhost:3000 pruebas-carga/carga.js       # carga sostenida
 k6 run -e BASE=http://localhost:3000 pruebas-carga/estres.js      # escalones hasta el quiebre
 k6 run -e BASE=http://localhost:3000 pruebas-carga/escenarios.js  # los seis flujos E1-E6
+k6 run -e BASE=http://localhost:3000 pruebas-carga/mensajeria.js  # techo del chat interno
 ```
 
 El script de siembra **se niega a correr contra cualquier host que no sea local**:

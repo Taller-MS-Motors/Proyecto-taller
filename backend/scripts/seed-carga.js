@@ -23,6 +23,11 @@ const N = {
   citas: 5000,
   ordenes: 1500,
   promos: 30,
+  // Mensajería interna: 5 000 mensajes repartidos entre el personal. La proporción
+  // con foto es la que define el peso del hilo, igual que motosConFoto define el de
+  // la base (el hilo devuelve 200 mensajes con la imagen embebida).
+  mensajes: 5000,
+  mensajesConFoto: 0.10,
   // Proporción de motos con foto. Las fotos se guardan como data URL en base64 dentro
   // de la propia tabla, así que este número es el que decide cuánto pesa la base.
   motosConFoto: 0.10,
@@ -151,6 +156,27 @@ async function enLotes(conn, sql, filas, tam = 500) {
   ]);
   await enLotes(conn, 'INSERT INTO promos (titulo, descripcion, descuento, imagen, activa) VALUES ?', promos, 20);
   console.log(`   promos: ${N.promos} (todas con imagen)`);
+
+  // Mensajería interna. Hasta ahora no se sembraba y el módulo quedaba sin medir,
+  // pese a ser el que más se parece al caso de las promos: el hilo devuelve los
+  // últimos 200 mensajes CON su foto embebida, y el frontend lo repite cada 12 s.
+  // Se reparten entre los empleados existentes, en pares, para que las consultas
+  // por conversación tengan volumen real que recorrer.
+  const [empleados] = await conn.query('SELECT id FROM usuarios WHERE activo = 1');
+  if (empleados.length >= 2) {
+    const ids = empleados.map((u) => u.id);
+    const mensajes = Array.from({ length: N.mensajes }, () => {
+      const a = al(ids);
+      let b = al(ids);
+      while (b === a && ids.length > 1) b = al(ids);
+      return [a, b, `Mensaje de prueba ${entero(1, 999999)}`, 'directo',
+        Math.random() < N.mensajesConFoto ? fotoFalsa() : null];
+    });
+    await enLotes(conn, 'INSERT INTO mensajes_internos (remitente_id, destino_id, mensaje, tipo, foto) VALUES ?', mensajes, 100);
+    console.log(`   mensajes: ${N.mensajes} (${Math.round(N.mensajes * N.mensajesConFoto)} con foto)`);
+  } else {
+    console.log('   mensajes: omitidos (hacen falta al menos 2 empleados activos)');
+  }
 
   const [[tam]] = await conn.query(
     "SELECT ROUND(SUM(DATA_LENGTH+INDEX_LENGTH)/1024/1024,1) mb FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()"
