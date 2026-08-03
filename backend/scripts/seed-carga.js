@@ -11,6 +11,11 @@
 // miles de clientes falsos en producción sería irreversible sin restaurar un respaldo.
 
 const mysql = require('mysql2/promise');
+const bcrypt = require('bcrypt');
+
+// Cliente de prueba con acceso al portal: lo usan los escenarios E1 y E2.
+const EMAIL_PRUEBA = 'cliente.carga@ejemplo.test';
+const PASS_PRUEBA = 'Prueba.Carga.2026';
 
 const N = {
   clientes: 2000,
@@ -82,9 +87,22 @@ async function enLotes(conn, sql, filas, tam = 500) {
     i % 10 === 0 ? hash : null,
   ]);
   await enLotes(conn, 'INSERT INTO clientes (nombre, apellido, telefono, email, cedula, password_hash) VALUES ?', clientes);
+
+  // Un cliente con contraseña REAL. Los 2000 de arriba llevan un hash de relleno que no
+  // sirve para entrar, así que sin este los escenarios del portal (E1 y E2 de
+  // escenarios.js) no tendrían con quién iniciar sesión.
+  const hashReal = await bcrypt.hash(PASS_PRUEBA, 10);
+  await conn.query(
+    `INSERT INTO clientes (nombre, apellido, telefono, email, cedula, password_hash)
+     VALUES ('Cliente', 'Carga', '80000000', ?, '999999999', ?)
+     ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash)`,
+    [EMAIL_PRUEBA, hashReal]
+  );
+  const [[{ idPortal }]] = await conn.query('SELECT id AS idPortal FROM clientes WHERE email = ?', [EMAIL_PRUEBA]);
+
   const [[{ minCliente }]] = await conn.query('SELECT MIN(id) AS minCliente FROM clientes');
   const [[{ maxCliente }]] = await conn.query('SELECT MAX(id) AS maxCliente FROM clientes');
-  console.log(`   clientes: ${N.clientes}`);
+  console.log(`   clientes: ${N.clientes} (+1 con portal: ${EMAIL_PRUEBA})`);
 
   // Motos. Solo una fracción lleva foto: son ~100 KB cada una y definen el peso real.
   const motos = Array.from({ length: N.motos }, () => [
@@ -93,6 +111,16 @@ async function enLotes(conn, sql, filas, tam = 500) {
     Math.random() < N.motosConFoto ? fotoFalsa() : null,
   ]);
   await enLotes(conn, 'INSERT INTO motos (cliente_id, marca, modelo, anio, placa, foto) VALUES ?', motos, 100);
+
+  // El cliente del portal necesita su propia moto: las de arriba se reparten al azar
+  // y podría quedarse sin ninguna, y sin moto el escenario E1 no puede agendar.
+  await conn.query(
+    `INSERT INTO motos (cliente_id, marca, modelo, anio, placa)
+     VALUES (?, 'Honda', 'CB 190R', 2024, 'CARGA01')
+     ON DUPLICATE KEY UPDATE cliente_id = VALUES(cliente_id)`,
+    [idPortal]
+  );
+
   const [[{ minMoto }]] = await conn.query('SELECT MIN(id) AS minMoto FROM motos');
   const [[{ maxMoto }]] = await conn.query('SELECT MAX(id) AS maxMoto FROM motos');
   console.log(`   motos: ${N.motos} (${Math.round(N.motos * N.motosConFoto)} con foto)`);

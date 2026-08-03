@@ -24,3 +24,6 @@ graphify-out/
 
 # Respaldos de la base: contienen datos reales de clientes. NUNCA versionar.
 backend/backups/
+
+# Informes crudos de Lighthouse: pesan MB y se regeneran con el comando de INFORME.md
+pruebas-carga/lighthouse/

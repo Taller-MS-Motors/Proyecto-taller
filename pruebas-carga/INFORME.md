@@ -86,6 +86,32 @@ Decisiones de diseño del escenario:
 - **Solo el 20 % escribe.** En un taller se consulta mucho más de lo que se agenda.
 - **Los `cliente_id` se toman de la base**, no se inventan (ver hallazgo 1).
 
+### Los seis escenarios funcionales
+
+`carga.js` mide un flujo mixto de personal para obtener el número de carga sostenida.
+Los **seis escenarios completos** del enunciado (E1–E6), cada uno con el rol que lo
+ejecuta en la realidad, están en [`escenarios.js`](escenarios.js):
+
+| # | Rol | Flujo | Endpoints |
+|---|---|---|---|
+| E1 | Cliente | Entra → inicio → agenda una cita | `/portal/resumen`, `/portal/motos`, `POST /portal/citas` |
+| E2 | Cliente | Entra → mis citas → sigue una | `/portal/citas`, `/portal/citas/:id` |
+| E3 | Recepción | Recibe → busca cliente → agenda | `/recepcion/citas-hoy`, `/recepcion/clientes?q=`, `POST /citas` |
+| E4 | Admin | Órdenes → filtra → abre una | `/ordenes`, `/ordenes?estado=`, `/ordenes/:id` |
+| E5 | Mecánico | Resumen → agenda → sus citas | `/mecanico/resumen`, `/mecanico/agenda`, `/mecanico/citas` |
+| E6 | Admin | Reportes del mes y del año | `/admin/resumen`, `/admin/reportes?periodo=` |
+
+Cada escenario corre con pocos usuarios y **umbral propio por etiqueta**, así se ve cuál
+incumple en vez del promedio de todos. Dos decisiones a dejar dichas:
+
+- **E4 no cambia el estado de la orden.** Las transiciones solo son válidas desde
+  ciertos estados: en una prueba masiva la mayoría daría 400 y se mediría el camino de
+  rechazo, no el trabajo real. Se cubre en las pruebas de API.
+- **E1 y E2 necesitaban un cliente con contraseña real.** Los 2 000 clientes sembrados
+  llevan un hash de relleno que no sirve para entrar, así que ningún escenario del
+  portal podía iniciar sesión. `seed-carga.js` ahora crea además un cliente de prueba
+  con contraseña conocida **y su moto** (sin moto, E1 no tiene sobre qué agendar).
+
 ---
 
 ## 4. Carga
@@ -258,6 +284,71 @@ promociones. La pantalla de ofertas sí las carga: antes de la corrección habr�
 varios MB sobre estos 1 180 KB, en el dispositivo con menos margen. El impacto real de
 esa corrección se ve mejor aquí que en los milisegundos de la prueba de carga local.
 
+### Ampliación: el resto de las pantallas públicas
+
+La medición anterior cubría solo `/portal/login`. Se agregaron las otras dos pantallas
+públicas del portal. **No se pueden medir las pantallas internas** (inicio, mis citas,
+agenda del mecánico, panel del administrador): están detrás de inicio de sesión y
+Lighthouse no autentica — habría que guionarlo con Puppeteer, que queda pendiente.
+
+Estas corridas usaron **Edge** (Chromium) porque la máquina no tiene Chrome, contra el
+entorno desplegado y desde una sola ubicación de red. Para que la comparación sea
+honesta se **volvió a medir `/portal/login` en las mismas condiciones**, en vez de
+compararlo contra los números de la corrida original:
+
+| Pantalla | Disp. | Perf | A11y | LCP | CLS | TBT |
+|---|---|---|---|---|---|---|
+| login *(remedido)* | escritorio | 81 | 94 | 1,5 s | 0 | 160 ms |
+| login *(remedido)* | móvil | 62 | 94 | 2,6 s | 0 | 1 380 ms |
+| **registro** | escritorio | **63 / 57** | **88** | **4,1 / 4,6 s** | 0 | 190 / 270 ms |
+| **registro** | móvil | **44** | **88** | **16,8 s** | 0 | **940 ms** |
+| **recuperar** | escritorio | 65 | 94 | 4,2 s | 0 | 130 ms |
+
+Registro se midió dos veces en escritorio: 63 y 57. La diferencia entre corridas es
+menor que la diferencia contra login, así que **no es ruido de red**.
+
+**Lectura honesta de estos números.** Hay que separar dos cosas que se confunden fácil:
+
+1. **El entorno de medición es peor que en la corrida original** (login pasó de 95 a 81
+   en escritorio). Cambió el navegador y la red, así que los valores absolutos de esta
+   tabla **no son comparables** con los de la sección anterior.
+2. **Aun así, registro es genuinamente peor que login**, medidos el mismo día con la
+   misma herramienta: 57–63 contra 81, y LCP de 4,1 s contra 1,5 s. Esa diferencia sí
+   es real y no la explica el entorno.
+
+**CLS = 0 en todas.** Se confirma en las cinco corridas: la estabilidad visual es una
+fortaleza consistente de la aplicación, no un dato suelto de una pantalla.
+
+**LCP incumple el umbral en registro y recuperar** (> 4 s es la banda "pobre" de
+Google). Lighthouse señala dos causas, ambas ya identificadas en este informe:
+
+- *"Reduce initial server response time — Root document took 960 ms"*: casi un segundo
+  antes de que el navegador reciba el documento.
+- *"Reduce unused JavaScript — Est savings of 863 KiB"*: es la misma carga diferida por
+  ruta de la recomendación 5, ahora cuantificada.
+
+---
+
+### Hallazgo 4 — Accesibilidad por debajo del objetivo en el registro
+
+**Detección.** `registro` puntúa **88** en accesibilidad, bajo el SLO de 90, mientras
+`recuperar` y `login` dan 94. La diferencia apunta a la pantalla, no al tema general.
+
+**Causas (las dos que reporta Lighthouse):**
+
+1. **`Form elements do not have associated labels`** — campos del formulario de registro
+   sin etiqueta asociada. Afecta a quien usa lector de pantalla: escucha "cuadro de
+   edición" sin saber qué se le pide. Es específico de esta pantalla y corregible.
+2. **`[user-scalable="no"]` en el `<meta name="viewport">`** — bloquea el zoom con los
+   dedos. Afecta a **toda** la aplicación, no solo al registro, y explica por qué
+   ninguna pantalla llega a 100. Es el valor por defecto de Ionic y es deliberado, pero
+   choca con que el sistema ofrezca ajuste de tamaño de texto por accesibilidad: una
+   persona con baja visión no puede ampliar.
+
+Ninguna de las dos se corrigió en esta ronda: la primera es un cambio de plantilla y la
+segunda es una decisión de producto (afecta la sensación de app nativa). Quedan
+registradas con su causa exacta para decidirlas.
+
 ---
 
 ## 7. Limitaciones y trabajo pendiente
@@ -268,14 +359,24 @@ Lo que este informe **no** demuestra, dicho explícitamente:
    cuesta. Es la razón por la que el hallazgo 2 se ve modesto en milisegundos pese a
    ser 528× menos tráfico. Una medición contra el entorno desplegado daría números
    peores y más realistas.
-2. **El frontend se midió solo en `/portal/login`.** Falta medir las pantallas con
-   datos cargados (ofertas, mis citas), que son las que traen contenido pesado. Tampoco
-   se usó WebPageTest ni se midió **INP**, que necesita interacción real del usuario y
-   no lo reporta un análisis de laboratorio.
-3. **El escalón de 800 usuarios quedó parcial**: la exportación de datos crudos frenó
+2. **Del frontend solo se midieron las tres pantallas públicas** (login, registro,
+   recuperar). Las internas —inicio del cliente, mis citas, ofertas, agenda del
+   mecánico, panel del administrador— están detrás de inicio de sesión y Lighthouse no
+   autentica: haría falta guionarlo con Puppeteer. Son justamente las que cargan datos
+   pesados, así que sus números serán peores que los de esta tabla.
+3. **No se usó WebPageTest** (red simulada 3G/4G, waterfall, filmstrip) ni se midió
+   **INP**: esa métrica necesita interacción real de usuario y no la reporta un análisis
+   de laboratorio; requiere datos de campo con `web-vitals.js`.
+4. **Los escenarios E1–E6 están escritos pero no ejecutados.** `escenarios.js` quedó
+   listo; falta correrlo contra la base sembrada y volcar sus números acá. Los
+   resultados de §4 y §5 corresponden a `carga.js` y `estres.js`, que sí se ejecutaron.
+5. **El escalón de 800 usuarios quedó parcial**: la exportación de datos crudos frenó
    al generador y no completó ese tramo. Los escalones hasta 400 sí son completos.
-4. **La máquina de prueba tiene 18 núcleos**; el contenedor de producción tiene una
+6. **La máquina de prueba tiene 18 núcleos**; el contenedor de producción tiene una
    fracción de eso. Los números absolutos de producción serán menores.
+7. **Las corridas de Lighthouse de la ampliación usaron Edge**, no Chrome (la máquina
+   no lo tiene). Ambos son Chromium y las métricas son equivalentes, pero por eso se
+   remidió login en las mismas condiciones en vez de comparar contra la corrida vieja.
 
 ### Recomendaciones, por prioridad
 
@@ -298,9 +399,12 @@ Lo que este informe **no** demuestra, dicho explícitamente:
 ## Cómo reproducir
 
 ```bash
-# 0. Frontend (Core Web Vitals)
-npx lighthouse <url>/portal/login --preset=desktop --output=html --output-path=lh.html
-npx lighthouse <url>/portal/login --output=html --output-path=lh-movil.html   # movil + red simulada
+# 0. Frontend (Core Web Vitals) — las tres pantallas publicas
+# Sin Chrome instalado: export CHROME_PATH="...\msedge.exe" (Edge tambien es Chromium)
+for p in login registro recuperar; do
+  npx lighthouse <url>/portal/$p --preset=desktop --output=json --output-path=lh-$p-escritorio.json
+  npx lighthouse <url>/portal/$p             --output=json --output-path=lh-$p-movil.json   # movil + red simulada
+done
 
 # 1. Base de pruebas
 node backend/src/db/migrate.js                     # con MYSQL_URL apuntando a la base local
@@ -311,8 +415,9 @@ MYSQL_URL=... WEB_CONCURRENCY=2 RATE_API_MAX=1000000 RATE_AUTH_MAX=1000000 \
   node backend/src/cluster.js
 
 # 3. Pruebas
-k6 run -e BASE=http://localhost:3000 pruebas-carga/carga.js
-k6 run -e BASE=http://localhost:3000 pruebas-carga/estres.js
+k6 run -e BASE=http://localhost:3000 pruebas-carga/carga.js       # carga sostenida
+k6 run -e BASE=http://localhost:3000 pruebas-carga/estres.js      # escalones hasta el quiebre
+k6 run -e BASE=http://localhost:3000 pruebas-carga/escenarios.js  # los seis flujos E1-E6
 ```
 
 El script de siembra **se niega a correr contra cualquier host que no sea local**:
