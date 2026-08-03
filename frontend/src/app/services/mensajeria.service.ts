@@ -8,7 +8,9 @@ export interface ChatContacto {
   id: number;
   nombre: string;
   rol: string;
-  foto: string | null;
+  // El avatar ya no viaja en la lista (es base64 y esto se refresca cada 15 s):
+  // solo si lo tiene. La imagen se pide aparte y se cachea (ver avatar()).
+  tiene_foto: number;
   telefono: string | null;
   ultimo_mensaje: string | null;
   ultimo_es_foto: number | null;
@@ -40,6 +42,24 @@ export class MensajeriaService {
   // <img src> directo: se pide por HTTP y llega la data URL.
   getFotoMensaje(mensajeId: number): Observable<{ data: string }> {
     return this.http.get<{ data: string }>(`${this.url}/mensaje/${mensajeId}/foto`);
+  }
+
+  // Avatares del personal, cacheados acá y no en cada componente: los comparten la
+  // lista de contactos y la cabecera del hilo, y una persona tiene un solo avatar.
+  // Se pide una vez por sesión; el resto son lecturas de memoria.
+  private avatares = new Map<number, string>();
+
+  avatar(usuarioId: number): string | null {
+    if (!this.avatares.has(usuarioId)) {
+      // Se reserva el lugar antes de pedir: esto lo llama la plantilla en cada
+      // ciclo de detección de cambios, y sin la marca dispararía peticiones en serie.
+      this.avatares.set(usuarioId, '');
+      this.http.get<{ data: string }>(`${this.url}/contacto/${usuarioId}/foto`).subscribe({
+        next: r => this.avatares.set(usuarioId, r.data),
+        error: () => this.avatares.delete(usuarioId),
+      });
+    }
+    return this.avatares.get(usuarioId) || null;
   }
 
   getNoLeidos(): Observable<{ data: { count: number } }> {

@@ -23,9 +23,11 @@
   <!-- Contactos -->
   <ng-container *ngIf="!cargando">
     <button type="button" class="cc-row" *ngFor="let c of filtrados" (click)="abrir.emit(c)">
-      <span class="cc-av" [class.sin-foto]="!c.foto">
-        <img *ngIf="c.foto" [src]="c.foto" alt="" />
-        <ng-container *ngIf="!c.foto">{{ iniciales(c.nombre) }}</ng-container>
+      <!-- El avatar se pide aparte y queda cacheado; hasta que llega se muestran
+           las iniciales, que es lo mismo que ve quien no tiene foto. -->
+      <span class="cc-av" [class.sin-foto]="!avatar(c)">
+        <img *ngIf="avatar(c) as f" [src]="f" alt="" />
+        <ng-container *ngIf="!avatar(c)">{{ iniciales(c.nombre) }}</ng-container>
       </span>
       <span class="cc-main">
         <span class="cc-top">

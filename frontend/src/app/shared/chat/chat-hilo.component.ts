@@ -111,6 +111,12 @@ export class ChatHiloComponent implements OnInit, OnChanges, OnDestroy {
     return m?.tiene_foto ? (this.fotos.get(m.id) || null) : null;
   }
 
+  // Avatar del contacto en la cabecera. La caché vive en el servicio, compartida con
+  // la lista de contactos: es la misma persona y el mismo avatar.
+  avatarContacto(): string | null {
+    return this.contacto?.tiene_foto ? this.msj.avatar(this.contacto.id) : null;
+  }
+
   enviar(textoOverride?: string) {
     const txt = (textoOverride || this.texto).trim();
     const foto = this.fotoPreview;

@@ -37,7 +37,9 @@ async function contactoValido(req) {
   const otro = Number(req.params.usuarioId);
   if (!Number.isInteger(otro) || otro <= 0 || otro === req.usuario.id) return null;
   const [[u]] = await pool.query(
-    'SELECT id, nombre, rol, foto, telefono FROM usuarios WHERE id = ? AND activo = 1',
+    // Sin el avatar: lo devuelve el hilo en cada refresco (cada 12 s) y es base64.
+    // Se pide aparte por /contacto/:id/foto y el cliente lo cachea.
+    'SELECT id, nombre, rol, (foto IS NOT NULL) AS tiene_foto, telefono FROM usuarios WHERE id = ? AND activo = 1',
     [otro]
   );
   return u || null;
@@ -50,25 +52,44 @@ async function contactoValido(req) {
 router.get('/contactos', async (req, res) => {
   try {
     const yo = req.usuario.id;
-    const PAR = `m.tipo IN ('directo','sistema')
-        AND ((m.remitente_id = u.id AND m.destino_id = ?) OR (m.remitente_id = ? AND m.destino_id = u.id))`;
+    // Antes esto eran cinco subconsultas correlacionadas POR CONTACTO: cuatro para
+    // sacar el mismo último mensaje (texto, si era foto, remitente y fecha) más un
+    // COUNT con un NOT EXISTS anidado. Con N empleados eran 5N recorridos de la tabla,
+    // y encima ordenaba por una columna calculada. Ahora son dos recorridos fijos:
+    //   · el último mensaje de cada par, con ROW_NUMBER sobre MIS mensajes (una pasada);
+    //   · los no leídos agrupados por remitente (una pasada).
+    // `u.foto` tampoco viaja: es el avatar en base64 y esta lista se refresca cada 15 s.
     const [contactos] = await pool.query(
-      `SELECT u.id, u.nombre, u.rol, u.foto, u.telefono,
-              (SELECT m.mensaje FROM mensajes_internos m WHERE ${PAR}
-               ORDER BY m.created_at DESC LIMIT 1) AS ultimo_mensaje,
-              (SELECT m.foto IS NOT NULL FROM mensajes_internos m WHERE ${PAR}
-               ORDER BY m.created_at DESC LIMIT 1) AS ultimo_es_foto,
-              (SELECT m.remitente_id FROM mensajes_internos m WHERE ${PAR}
-               ORDER BY m.created_at DESC LIMIT 1) AS ultimo_remitente_id,
-              (SELECT m.created_at FROM mensajes_internos m WHERE ${PAR}
-               ORDER BY m.created_at DESC LIMIT 1) AS ultima_fecha,
-              (SELECT COUNT(*) FROM mensajes_internos m
-               WHERE m.tipo IN ('directo','sistema') AND m.remitente_id = u.id AND m.destino_id = ?
-                 AND NOT EXISTS(SELECT 1 FROM mensaje_lecturas ml WHERE ml.mensaje_id = m.id AND ml.usuario_id = ?)) AS no_leidos
+      `SELECT u.id, u.nombre, u.rol, u.telefono,
+              (u.foto IS NOT NULL) AS tiene_foto,
+              ult.mensaje       AS ultimo_mensaje,
+              ult.es_foto       AS ultimo_es_foto,
+              ult.remitente_id  AS ultimo_remitente_id,
+              ult.created_at    AS ultima_fecha,
+              COALESCE(nl.n, 0) AS no_leidos
        FROM usuarios u
+       LEFT JOIN (
+         SELECT otro, mensaje, es_foto, remitente_id, created_at FROM (
+           SELECT IF(m.remitente_id = ?, m.destino_id, m.remitente_id) AS otro,
+                  m.mensaje, (m.foto IS NOT NULL) AS es_foto, m.remitente_id, m.created_at,
+                  ROW_NUMBER() OVER (
+                    PARTITION BY IF(m.remitente_id = ?, m.destino_id, m.remitente_id)
+                    ORDER BY m.created_at DESC, m.id DESC
+                  ) AS rn
+           FROM mensajes_internos m
+           WHERE m.tipo IN ('directo','sistema') AND (m.remitente_id = ? OR m.destino_id = ?)
+         ) x WHERE x.rn = 1
+       ) ult ON ult.otro = u.id
+       LEFT JOIN (
+         SELECT m.remitente_id, COUNT(*) AS n
+         FROM mensajes_internos m
+         WHERE m.tipo IN ('directo','sistema') AND m.destino_id = ?
+           AND NOT EXISTS(SELECT 1 FROM mensaje_lecturas ml WHERE ml.mensaje_id = m.id AND ml.usuario_id = ?)
+         GROUP BY m.remitente_id
+       ) nl ON nl.remitente_id = u.id
        WHERE u.activo = 1 AND u.id <> ?
-       ORDER BY (ultima_fecha IS NULL), ultima_fecha DESC, u.nombre`,
-      [yo, yo, yo, yo, yo, yo, yo, yo, yo, yo, yo]
+       ORDER BY (ult.created_at IS NULL), ult.created_at DESC, u.nombre`,
+      [yo, yo, yo, yo, yo, yo, yo]
     );
     // Avisos (broadcast a mecánicos) sin leer: solo aplican al rol tecnico.
     let avisos_no_leidos = 0;
@@ -210,6 +231,22 @@ router.get('/mensaje/:id/foto', async (req, res) => {
       return res.status(404).json({ error: 'Sin imagen' });
     }
     res.json({ data: m.foto });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+// GET /api/mensajeria/contacto/:id/foto — el avatar de un compañero, fuera del listado.
+// Acá no hace falta el control del par: el avatar de una persona del personal lo ve
+// todo el personal (ya salía en la lista de contactos para todos). Solo se exige que
+// sea alguien activo, igual que el resto del módulo.
+router.get('/contacto/:id/foto', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Id inválido' });
+    const [[u]] = await pool.query('SELECT foto FROM usuarios WHERE id = ? AND activo = 1', [id]);
+    if (!u || !u.foto) return res.status(404).json({ error: 'Sin imagen' });
+    res.json({ data: u.foto });
   } catch (err) {
     fail(res, err);
   }

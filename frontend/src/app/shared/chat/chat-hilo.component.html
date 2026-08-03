@@ -4,10 +4,10 @@
     <button type="button" class="ch-back" (click)="volver.emit()" aria-label="Volver">
       <ion-icon name="chevron-back"></ion-icon>
     </button>
-    <span class="ch-av" [class.bc]="esAvisos" [class.sin-foto]="!esAvisos && !contacto?.foto">
+    <span class="ch-av" [class.bc]="esAvisos" [class.sin-foto]="!esAvisos && !avatarContacto()">
       <ion-icon *ngIf="esAvisos" name="megaphone-outline"></ion-icon>
-      <img *ngIf="!esAvisos && contacto?.foto" [src]="contacto?.foto" alt="" />
-      <ng-container *ngIf="!esAvisos && !contacto?.foto">{{ iniciales(contacto?.nombre) }}</ng-container>
+      <img *ngIf="!esAvisos && avatarContacto() as f" [src]="f" alt="" />
+      <ng-container *ngIf="!esAvisos && !avatarContacto()">{{ iniciales(contacto?.nombre) }}</ng-container>
     </span>
     <div class="ch-info">
       <strong>{{ esAvisos ? 'Avisos del taller' : contacto?.nombre }}</strong>

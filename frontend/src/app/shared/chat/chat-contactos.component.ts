@@ -61,6 +61,12 @@ export class ChatContactosComponent implements OnInit, OnDestroy {
     return prefijo + (c.ultimo_es_foto ? '📷 Foto' : '');
   }
 
+  // Avatar del compañero. La caché vive en el servicio: se comparte con la cabecera
+  // del hilo y se pide una sola vez por sesión, aunque la lista se refresque cada 15 s.
+  avatar(c: ChatContacto): string | null {
+    return c?.tiene_foto ? this.msj.avatar(c.id) : null;
+  }
+
   iniciales(nombre: string): string {
     const p = (nombre || '?').trim().split(/\s+/);
     return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase();
