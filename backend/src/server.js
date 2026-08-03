@@ -147,8 +147,27 @@ app.use('/api', (err, req, res, next) => {
 });
 
 if (hasFrontend) {
-  app.use(express.static(frontendDist));
+  // Los assets del build llevan el hash del contenido en el nombre
+  // (main.b8e0610d56ade15b.js): si el contenido cambia, cambia el nombre. Por eso se
+  // pueden cachear para siempre. Sin esto Express mandaba `max-age=0` y el navegador
+  // revalidaba los ~31 archivos en CADA visita: un viaje de ida y vuelta por archivo
+  // para que el servidor responda "no cambió".
+  // index.html es la excepción y va sin caché: es el que apunta a los hashes nuevos,
+  // así que si se cachea, un deploy no se ve hasta que venza.
+  const UN_ANIO = 365 * 24 * 60 * 60;
+  const CON_HASH = /\.[0-9a-f]{8,}\.(js|css)$/i;
+  app.use(express.static(frontendDist, {
+    setHeaders: (res, ruta) => {
+      if (CON_HASH.test(ruta)) {
+        res.setHeader('Cache-Control', `public, max-age=${UN_ANIO}, immutable`);
+      } else if (ruta.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-cache');
+      }
+    },
+  }));
   app.get('/{*path}', (req, res) => {
+    // Mismo criterio para el index que sirve el enrutado del SPA.
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(frontendDist, 'index.html'));
   });
   console.log('🌐 Sirviendo frontend desde', frontendDist);

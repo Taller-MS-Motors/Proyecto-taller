@@ -345,9 +345,39 @@ Google). Lighthouse señala dos causas, ambas ya identificadas en este informe:
    choca con que el sistema ofrezca ajuste de tamaño de texto por accesibilidad: una
    persona con baja visión no puede ampliar.
 
-Ninguna de las dos se corrigió en esta ronda: la primera es un cambio de plantilla y la
-segunda es una decisión de producto (afecta la sensación de app nativa). Quedan
-registradas con su causa exacta para decidirlas.
+**Corrección aplicada (la primera).** Los campos sin etiqueta eran **nombre**,
+**apellido** y **confirmar contraseña**. El detalle interesante: el `<input>` real vive
+dentro del shadow DOM de Ionic y no queda asociado al `<ion-label>`, así que los demás
+campos **se salvaban de casualidad** porque su `placeholder` cumple de nombre accesible.
+Los tres que no tenían placeholder quedaban mudos para un lector de pantalla. Se les
+puso `aria-label` explícito, que es la forma correcta y no depende del placeholder.
+
+**La segunda queda pendiente**: `user-scalable=no` es una decisión de producto (afecta
+la sensación de app nativa) y afecta a toda la aplicación, no solo al registro.
+
+---
+
+### Hallazgo 5 — Los archivos con hash se revalidaban en cada visita
+
+**Detección.** Al revisar por qué el documento tarda, se midieron las cabeceras que
+manda producción para un asset con hash:
+
+```
+GET /main.b8e0610d56ade15b.js  →  Cache-Control: public, max-age=0
+```
+
+**Causa.** `express.static` sin opciones no fija `max-age`. Los archivos del build
+llevan el hash del contenido en el nombre —si cambia el contenido, cambia el nombre—
+así que podrían cachearse indefinidamente, pero el navegador estaba obligado a
+revalidar **los ~31 archivos JS en cada visita**: un viaje de ida y vuelta por archivo
+para que el servidor conteste "no cambió".
+
+**Corrección.** Los archivos con hash se sirven con `max-age` de un año e `immutable`;
+`index.html` se sirve con `no-cache` porque es el que apunta a los hashes nuevos y, si
+se cacheara, un despliegue no se vería hasta que venciera.
+
+**A quién beneficia.** A las visitas repetidas, que es el caso normal: el personal del
+taller abre la aplicación todos los días.
 
 ---
 
@@ -476,10 +506,25 @@ Lo que este informe **no** demuestra, dicho explícitamente:
 3. **Store compartido (Redis) para el limitador de tasa** antes de escalar a varias
    instancias: hoy es por proceso y el cupo efectivo se multiplica.
 4. **Paginación estricta** en los listados globales, que hoy tienen un tope de 500 filas.
-5. **Carga diferida por ruta en el frontend.** Son 514 KB de JavaScript en la carga
-   inicial y un TBT de 480 ms en móvil: el portal del cliente arrastra código del panel
-   de administración que nunca va a usar. Es la mayor mejora pendiente de cara a las
-   tiendas de aplicaciones, donde el objetivo es un teléfono de gama media.
+5. ~~**Carga diferida por ruta en el frontend.**~~ **Corregido: este diagnóstico era
+   falso.** Se verificó buscando cadenas propias del panel de administración
+   (`admin-empleados`, "Gestión de Empleados", "Resumen ejecutivo") dentro de
+   `main.js`: **cero apariciones**. La carga diferida por ruta **ya está bien hecha** —
+   el código de la aplicación son 2 198 KB repartidos en 83 chunks que se bajan bajo
+   demanda, y `main.js` contiene solo el framework.
+
+   El paquete inicial es, entonces, **el piso de Angular + Ionic**, no código de más.
+   También se descartó que arrastrara el compilador JIT: se cambió el arranque a
+   `platformBrowser()` y el archivo resultante salió **con el hash idéntico** (el build
+   moderno ya lo elimina), así que el cambio se revirtió por no aportar nada.
+
+   Consecuencia para el SLO: **el objetivo de < 500 KB no es alcanzable** sin cambiar de
+   framework. Corresponde subirlo (~700 KB) o dejar constancia de por qué se acepta.
+
+6. **Poner un CDN delante (Cloudflare u otro).** Lighthouse marca
+   `server-response-time` en **960 ms** para el documento raíz, con puntuación 0. No es
+   código: es latencia geográfica hasta Railway más el arranque del contenedor. Es la
+   mayor mejora pendiente de LCP y no se resuelve desde la aplicación.
 
 ---
 

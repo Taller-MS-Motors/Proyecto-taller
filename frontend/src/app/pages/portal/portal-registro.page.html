@@ -14,11 +14,15 @@
       <ion-card-content>
         <ion-item lines="full">
           <ion-label position="stacked">Nombre</ion-label>
-          <ion-input [(ngModel)]="nombre" autocomplete="given-name"></ion-input>
+          <!-- aria-label explícito: el <input> real vive dentro del shadow DOM de Ionic
+               y no queda asociado al ion-label, así que un lector de pantalla anunciaba
+               "cuadro de edición" sin decir qué se pide. Los otros campos se salvaban de
+               casualidad por su placeholder; acá se dice de forma explícita. -->
+          <ion-input [(ngModel)]="nombre" autocomplete="given-name" aria-label="Nombre"></ion-input>
         </ion-item>
         <ion-item lines="full">
           <ion-label position="stacked">Apellido</ion-label>
-          <ion-input [(ngModel)]="apellido" autocomplete="family-name"></ion-input>
+          <ion-input [(ngModel)]="apellido" autocomplete="family-name" aria-label="Apellido"></ion-input>
         </ion-item>
         <ion-item lines="full">
           <ion-label position="stacked">Teléfono</ion-label>
@@ -42,7 +46,8 @@
         </ion-item>
         <ion-item lines="none">
           <ion-label position="stacked">Confirmar contraseña</ion-label>
-          <ion-input [type]="verConfirmar ? 'text' : 'password'" [(ngModel)]="confirmar" (keyup.enter)="registrar()">
+          <ion-input [type]="verConfirmar ? 'text' : 'password'" [(ngModel)]="confirmar" (keyup.enter)="registrar()"
+                     aria-label="Confirmar contraseña">
             <ion-button fill="clear" slot="end" (click)="verConfirmar = !verConfirmar" aria-label="Mostrar contraseña">
               <ion-icon slot="icon-only" [name]="verConfirmar ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
             </ion-button>
