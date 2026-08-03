@@ -253,6 +253,24 @@ async function ensureSchema() {
     // bloqueo de rango (FOR UPDATE) del control de cupo sea preciso.
     await crearIndiceSiFalta('citas', 'idx_citas_fecha_hora', '(fecha, hora)');
 
+    // Core Web Vitals medidos en los navegadores reales (LCP, CLS, INP, FCP, TTFB).
+    // INP solo existe con interacción de una persona: Lighthouse, que corre en
+    // laboratorio, no lo reporta. Esta tabla es la única forma de tener ese número.
+    // `ruta` se guarda sin querystring para poder agrupar por pantalla.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS web_vitals (
+        id         INT AUTO_INCREMENT PRIMARY KEY,
+        metrica    VARCHAR(10) NOT NULL,
+        valor      DOUBLE NOT NULL,
+        calificacion VARCHAR(20),
+        ruta       VARCHAR(200) NOT NULL,
+        movil      TINYINT(1) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_wv_metrica (metrica, created_at),
+        INDEX idx_wv_ruta (ruta)
+      )
+    `);
+
     // Chat interno: las consultas filtran por el PAR (remitente + destino) y ordenan
     // por fecha, pero la tabla solo tenía índices de una columna, así que MySQL entraba
     // por uno y filtraba y ordenaba el resto en memoria. Van los dos sentidos porque

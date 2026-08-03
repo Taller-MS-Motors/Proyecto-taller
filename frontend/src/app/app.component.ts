@@ -2,6 +2,7 @@ import { Component, NgZone, OnInit } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter, take } from 'rxjs/operators';
 import { AccesibilidadService } from './services/accesibilidad.service';
+import { iniciarWebVitals } from './shared/web-vitals.util';
 
 declare global {
   interface Window { __hideBootSplash?: () => void; }
@@ -30,5 +31,9 @@ export class AppComponent implements OnInit {
     this.router.events
       .pipe(filter((e) => e instanceof NavigationEnd), take(1))
       .subscribe(() => window.__hideBootSplash?.());
+
+    // Core Web Vitals de usuarios reales. Es la única vía para conocer el INP:
+    // Lighthouse no interactúa con la página, así que en laboratorio no existe.
+    iniciarWebVitals();
   }
 }
