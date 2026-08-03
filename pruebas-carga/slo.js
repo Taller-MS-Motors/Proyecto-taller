@@ -27,6 +27,9 @@
 export const SLO = {
   p95_ms: 500,
   p99_ms: 1500,
+  // Escrituras: más flojo a propósito (ver nota de arriba). Estaba solo como número
+  // suelto en los umbrales; se nombra acá para que los otros scripts lo reusen.
+  p95_escritura_ms: 1000,
   error_max: 0.01,
   concurrentes: 50,
 };
@@ -40,7 +43,7 @@ export const umbrales = {
   'http_req_duration{operacion:listar_ordenes}': [`p(95)<${SLO.p95_ms}`],
   'http_req_duration{operacion:listar_clientes}': [`p(95)<${SLO.p95_ms}`],
   'http_req_duration{operacion:listar_promos}': [`p(95)<${SLO.p95_ms}`],
-  'http_req_duration{operacion:crear_cita}': ['p(95)<1000'],
+  'http_req_duration{operacion:crear_cita}': [`p(95)<${SLO.p95_escritura_ms}`],
   // Los checks funcionales tienen que pasar casi siempre: si la app responde rápido
   // pero devuelve basura, la prueba no puede darse por buena.
   checks: ['rate>0.99'],

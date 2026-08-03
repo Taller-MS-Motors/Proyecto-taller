@@ -44,9 +44,9 @@ export const options = {
     },
   },
   thresholds: {
-    'http_req_duration{op:hilo}': [`p(95)<${SLO.p95}`],
-    'http_req_duration{op:contactos}': [`p(95)<${SLO.p95}`],
-    http_req_failed: [`rate<${SLO.errorMax}`],
+    'http_req_duration{op:hilo}': [`p(95)<${SLO.p95_ms}`],
+    'http_req_duration{op:contactos}': [`p(95)<${SLO.p95_ms}`],
+    http_req_failed: [`rate<${SLO.error_max}`],
     checks: ['rate>0.99'],
   },
   summaryTrendStats: ['avg', 'min', 'med', 'p(95)', 'p(99)', 'max'],
