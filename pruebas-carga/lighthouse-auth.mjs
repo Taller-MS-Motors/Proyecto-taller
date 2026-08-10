@@ -102,6 +102,15 @@ try {
         localStorage.setItem(k, t);
         if (d) localStorage.setItem(kd, JSON.stringify(d));
       }, CLAVES.token, token, CLAVES.datos, datos);
+
+      // Sembrar la sesión obliga a visitar el sitio primero, así que el navegador
+      // queda con los bundles en caché. Sumado a `disableStorageReset` —que conserva
+      // la caché HTTP además del almacenamiento— se estaría midiendo una VISITA
+      // REPETIDA, con números mucho mejores y no comparables con una carga fría.
+      // Se vacía solo la caché de red, dejando intacto el localStorage con la sesión.
+      const cdp = await pagina.createCDPSession();
+      await cdp.send('Network.clearBrowserCache');
+      await cdp.detach();
       await pagina.close();
 
       const res = await lighthouse(url, {
@@ -119,20 +128,35 @@ try {
       if (i === 1 && !lhr.finalDisplayedUrl.includes(ruta)) {
         console.warn(`  ⚠️  ${ruta} terminó en ${lhr.finalDisplayedUrl} — la sesión no se aplicó`);
       }
-      puntajes.push({
-        perf: Math.round(lhr.categories.performance.score * 100),
-        a11y: Math.round(lhr.categories.accessibility.score * 100),
-        lcp: lhr.audits['largest-contentful-paint'].numericValue,
-        cls: lhr.audits['cumulative-layout-shift'].numericValue,
-        tbt: lhr.audits['total-blocking-time'].numericValue,
-      });
+      // Una corrida puede no producir métricas (la página no cargó, se cortó la red).
+      // Se descarta esa corrida en vez de arrastrar un undefined hasta el formateo,
+      // que es donde antes explotaba con un error que no decía nada del problema real.
+      const n = (id) => lhr.audits?.[id]?.numericValue;
+      const punto = {
+        perf: Math.round((lhr.categories?.performance?.score ?? 0) * 100),
+        a11y: Math.round((lhr.categories?.accessibility?.score ?? 0) * 100),
+        lcp: n('largest-contentful-paint'),
+        cls: n('cumulative-layout-shift'),
+        tbt: n('total-blocking-time'),
+      };
+      if (Object.values(punto).some((v) => v === undefined || Number.isNaN(v))) {
+        const falla = lhr.runtimeError?.message || 'métricas incompletas';
+        console.warn(`  ⚠️  ${ruta} corrida ${i} descartada: ${falla}`);
+      } else {
+        puntajes.push(punto);
+      }
       if (i === CORRIDAS) writeFileSync(`${salida}/${nombre}.json`, JSON.stringify(lhr));
     }
 
+    if (!puntajes.length) {
+      console.log(`${ruta.padEnd(22)} sin datos: las ${CORRIDAS} corridas fallaron`);
+      continue;
+    }
     const m = (c) => mediana(puntajes.map((p) => p[c]));
+    const aviso = puntajes.length < CORRIDAS ? `  (mediana de ${puntajes.length}/${CORRIDAS})` : '';
     console.log(
       `${ruta.padEnd(22)} perf ${String(m('perf')).padStart(3)} | a11y ${m('a11y')} | ` +
-      `LCP ${(m('lcp') / 1000).toFixed(1)}s | CLS ${m('cls').toFixed(3)} | TBT ${Math.round(m('tbt'))}ms`
+      `LCP ${(m('lcp') / 1000).toFixed(1)}s | CLS ${m('cls').toFixed(3)} | TBT ${Math.round(m('tbt'))}ms${aviso}`
     );
   }
 } finally {
