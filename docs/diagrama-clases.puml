@@ -62,9 +62,36 @@ enum RolUsuario {
   tecnico
 }
 
+' Jerarquía: recepcion < tecnico < admin (middleware/roles.js).
+' `requireRol` hereda hacia arriba; `soloRoles` exige pertenencia exacta, para los
+' casos en que un rol intermedio NO debe tener un permiso de uno inferior (el técnico
+' no gestiona la agenda, la recepción sí).
+
+enum EtapaOrden {
+  recepcion
+  diagnostico
+  esperando_aprobacion
+  esperando_repuestos
+  en_reparacion
+  lista_entrega
+}
+
+enum PrioridadTarea {
+  baja
+  normal
+  alta
+  urgente
+}
+
 ' ══════════════════════════════════════
 ' MODELOS (INTERFACES DE DATOS)
 ' ══════════════════════════════════════
+'
+' Cubren las 22 tablas de dominio. Quedan FUERA a propósito cuatro tablas de
+' infraestructura, que no son entidades del negocio y solo agregarían ruido:
+'   · password_reset_codes, login_codes, email_verify_codes — códigos de un solo uso,
+'     con vencimiento; se crean y se borran dentro del propio flujo de acceso.
+'   · orden_contadores — contador por año para numerar las OT (OT-YYYY-XXXX).
 
 package "Modelos" #16213e {
 
@@ -209,6 +236,118 @@ package "Modelos" #16213e {
     + activa: boolean
   }
 
+  class OrdenTiempo <<interface>> {
+    + id: number
+    + orden_id: number
+    + etapa: EtapaOrden
+    + inicio: string
+    + fin: string
+  }
+
+  class OrdenChecklist <<interface>> {
+    + id: number
+    + orden_id: number
+    + prueba_realizada: boolean
+    + lavado: boolean
+    + calidad_revisada: boolean
+    + facturacion_lista: boolean
+    + cliente_notificado: boolean
+    + observaciones: string
+  }
+
+  class MensajeInterno <<interface>> {
+    + id: number
+    + remitente_id: number
+    + destino_id: number
+    + destino_rol: string
+    + tipo: string
+    + mensaje: string
+    + foto: string
+    + orden_id: number
+    + sucursal_id: number
+    + created_at: string
+  }
+
+  class MensajeLectura <<interface>> {
+    + mensaje_id: number
+    + usuario_id: number
+    + created_at: string
+  }
+
+  class Notificacion <<interface>> {
+    + id: number
+    + cliente_id: number
+    + cita_id: number
+    + titulo: string
+    + mensaje: string
+    + tipo: string
+    + leida: boolean
+    + created_at: string
+  }
+
+  class TareaMecanico <<interface>> {
+    + id: number
+    + tecnico_id: number
+    + titulo: string
+    + detalle: string
+    + prioridad: PrioridadTarea
+    + hecha: boolean
+    + asignado_por: number
+    + vence: string
+  }
+
+  class RecompensaCanjeada <<interface>> {
+    + id: number
+    + cliente_id: number
+    + orden_id: number
+    + aplicado_por: number
+    + descripcion: string
+    + created_at: string
+  }
+
+  class Sucursal <<interface>> {
+    + id: number
+    + nombre: string
+    + direccion: string
+    + telefono: string
+    + activa: boolean
+    + orden: number
+  }
+
+  class Servicio <<interface>> {
+    + id: number
+    + nombre: string
+    + activo: boolean
+    + orden: number
+  }
+
+  class Configuracion <<interface>> {
+    + id: number
+    + nombre_taller: string
+    + telefono: string
+    + email: string
+    + direccion: string
+    + logo: string
+    + max_citas_hora: number
+    + dias_anticipacion: number
+    + duracion_cita_min: number
+    + horarios: Horario[]
+    + notif_estado: boolean
+    + notif_recordatorio: boolean
+    + notif_cotizacion: boolean
+    + notif_email_entrega: boolean
+  }
+
+  class WebVital <<interface>> {
+    + id: number
+    + metrica: string
+    + valor: number
+    + calificacion: string
+    + ruta: string
+    + movil: boolean
+    + created_at: string
+  }
+
 }
 
 ' Relaciones entre modelos
@@ -225,10 +364,25 @@ Orden "1" -- "*" OrdenAvance : registra >
 Orden "1" -- "*" OrdenFoto : evidencia >
 Orden "1" -- "*" Garantia : genera >
 Garantia "1" -- "*" GarantiaFoto : adjunta >
+Orden "1" -- "*" OrdenTiempo : cronometra >
+Orden "1" -- "0..1" OrdenChecklist : cierra con >
+Cliente "1" -- "*" Notificacion : recibe >
+Cliente "1" -- "*" RecompensaCanjeada : canjea >
+Cita "0..1" -- "*" Notificacion : origina >
+Usuario "1" -- "*" TareaMecanico : ejecuta >
+Usuario "1" -- "*" MensajeInterno : envía >
+MensajeInterno "1" -- "*" MensajeLectura : marcada por >
+MensajeInterno "0..1" -- "0..1" Orden : refiere a >
+Sucursal "1" -- "*" Usuario : emplea >
+Sucursal "1" -- "*" Cita : recibe >
 Cita ..> EstadoCita : usa
 Orden ..> EstadoOrden : usa
 Garantia ..> EstadoGarantia : usa
 Usuario ..> RolUsuario : usa
+OrdenTiempo ..> EtapaOrden : usa
+TareaMecanico ..> PrioridadTarea : usa
+Cita ..> Servicio : elige de >
+Configuracion ..> Sucursal : rige horarios de >
 
 ' ══════════════════════════════════════
 ' SERVICIOS
@@ -383,6 +537,50 @@ package "Servicios" #16213e {
     + desactivar(): Promise<void>
   }
 
+  class MensajeriaService <<Service>> {
+    - avatares: Map<number, string>
+    --
+    + getContactos(): Observable<ChatContacto[]>
+    + getConversacion(usuarioId: number): Observable
+    + enviar(usuarioId: number, mensaje: string, foto: string): Observable
+    + getFotoMensaje(mensajeId: number): Observable
+    + avatar(usuarioId: number): string
+    + getNoLeidos(): Observable<number>
+    + getAvisos(): Observable
+    + enviarAviso(mensaje: string, foto: string): Observable
+  }
+
+  class PromosService <<Service>> {
+    + getAll(): Observable<Promo[]>
+    + getImagen(id: number): Observable<string>
+    + create(promo: Promo): Observable
+    + update(id: number, promo: Promo): Observable
+    + toggle(id: number): Observable
+    + delete(id: number): Observable
+  }
+
+  class UsuariosService <<Service>> {
+    + getAll(): Observable<Usuario[]>
+    + create(data: object): Observable
+    + update(id: number, data: Partial<Usuario>): Observable
+    + toggleActivo(id: number, activo: boolean): Observable
+    + setSucursal(id: number, sucursal_id: number): Observable
+    + eliminar(id: number): Observable
+  }
+
+  class DashboardService <<Service>> {
+    + getResumen(): Observable
+    + getTecnicos(): Observable
+    + getTiempos(): Observable
+    + getAtrasos(): Observable
+  }
+
+  class MarcaService <<Service>> {
+    + get(): Observable<Marca>
+    + invalidar(): void
+    + logoParaDocumento(m: Marca): string
+  }
+
 }
 
 ' Dependencias de servicios con modelos
@@ -394,6 +592,14 @@ CitasService --> Cita
 OrdenesService --> Orden
 OrdenesService --> OrdenRepuesto
 GarantiasService --> Garantia
+MensajeriaService --> MensajeInterno
+PromosService --> Promo
+UsuariosService --> Usuario
+AdminService --> Configuracion
+AdminService --> Sucursal
+AdminService --> TareaMecanico
+AdminService --> Servicio
+PortalService --> Notificacion
 
 ' ══════════════════════════════════════
 ' GUARDS (PROTECCIÓN DE RUTAS)
@@ -461,6 +667,8 @@ package "Módulo Admin" #0f3460 {
   class AdminTareasPage <<Component>>
   class AdminMensajesPage <<Component>>
   class AdminReportesPage <<Component>>
+  class AdminOpinionesPage <<Component>>
+  class AdminServiciosPage <<Component>>
   class AdminPromosPage <<Component>>
   class AdminConfigPage <<Component>>
   class AdminPerfilPage <<Component>>
@@ -470,6 +678,7 @@ package "Módulo Recepción" #0f3460 {
   class RecepcionTabsPage <<Component>>
   class RecepcionPage <<Component>>
   class RecepcionAgendaPage <<Component>>
+  class RecepcionAgendarPage <<Component>>
   class RecepcionOrdenesPage <<Component>>
   class RecepcionCotizPage <<Component>>
   class RecepcionMensajesPage <<Component>>
@@ -491,37 +700,105 @@ package "Módulo Portal Cliente" #0f3460 {
   class PortalTabsPage <<Component>>
   class PortalLoginPage <<Component>>
   class PortalRegistroPage <<Component>>
+  class PortalRecuperarPage <<Component>>
   class PortalInicioPage <<Component>>
   class PortalCitasPage <<Component>>
   class PortalCitaDetallePage <<Component>>
   class PortalAgendarPage <<Component>>
   class PortalMotosPage <<Component>>
+  class PortalMotoHistorialPage <<Component>>
   class PortalOfertasPage <<Component>>
   class PortalPerfilPage <<Component>>
   class PortalNotificacionesPage <<Component>>
+  class PortalLegalPage <<Component>>
 }
 
 package "Páginas Compartidas" #0f3460 {
-  class DetalleOrdenPage <<Component>>
-  class ClientesPage <<Component>>
-  class FacturaPage <<Component>>
-  class GarantiasPage <<Component>>
-  class OrdenesPage <<Component>>
+  class TabsPage <<Component>>
   class DashboardPage <<Component>>
+  class OrdenesPage <<Component>>
+  class NuevaOrdenPage <<Component>>
+  class DetalleOrdenPage <<Component>>
+  class FacturaPage <<Component>>
+  class CitasPage <<Component>>
+  class CitaFormPage <<Component>>
+  class ClientesPage <<Component>>
+  class ClienteFormPage <<Component>>
+  class ClienteDetallePage <<Component>>
+  class MotosPage <<Component>>
+  class MotoFormPage <<Component>>
+  class MotoHistorialPage <<Component>>
+  class PromosPage <<Component>>
+  class GarantiasPage <<Component>>
+}
+
+package "Componentes Compartidos" #0f3460 {
+  class ChatContactosComponent <<Component>> {
+    + abrir: EventEmitter<ChatContacto>
+    + abrirAvisos: EventEmitter<void>
+    --
+    + avatar(c: ChatContacto): string
+    + preview(c: ChatContacto): string
+  }
+
+  class ChatHiloComponent <<Component>> {
+    + contacto: ChatContacto
+    + modo: string
+    + volver: EventEmitter<void>
+    - fotos: Map<number, string>
+    --
+    + fotoDe(m: MensajeInterno): string
+    + enviar(texto: string): void
+  }
+
+  class DosFaComponent <<Component>> {
+    + activar(codigo: string): void
+    + desactivar(password: string): void
+  }
+
+  class EstadoLabelPipe <<Pipe>> {
+    + transform(estado: string): string
+  }
+
+  class EstadoColorPipe <<Pipe>> {
+    + transform(estado: string): string
+  }
+
+  class PrecargaPorRol <<Strategy>> {
+    + preload(ruta: Route, cargar: Function): Observable
+  }
 }
 
 ' Dependencias módulos -> servicios
 AdminResumenPage ..> AdminService
-AdminEmpleadosPage ..> AdminService
+AdminEmpleadosPage ..> UsuariosService
+AdminServiciosPage ..> AdminService
+AdminOpinionesPage ..> AdminService
+AdminPromosPage ..> PromosService
+AdminMensajesPage ..> MensajeriaService
 RecepcionPage ..> RecepcionService
-RecepcionMensajesPage ..> RecepcionService
+RecepcionMensajesPage ..> MensajeriaService
+RecepcionCotizPage ..> RecepcionService
 MecanicoPage ..> MecanicoService
-MecanicoContactoPage ..> MecanicoService
+MecanicoContactoPage ..> MensajeriaService
 PortalInicioPage ..> PortalService
 PortalCitasPage ..> PortalService
+PortalOfertasPage ..> PortalService
+DashboardPage ..> DashboardService
 DetalleOrdenPage ..> OrdenesService
+FacturaPage ..> MarcaService
 ClientesPage ..> ClientesService
 GarantiasPage ..> GarantiasService
+PromosPage ..> PromosService
+CitasPage ..> CitasService
+MotosPage ..> MotosService
+
+' Los tres paneles reusan el mismo chat: es un componente, no una página por rol.
+AdminMensajesPage ..> ChatContactosComponent
+RecepcionMensajesPage ..> ChatContactosComponent
+MecanicoContactoPage ..> ChatContactosComponent
+ChatContactosComponent ..> MensajeriaService
+ChatHiloComponent ..> MensajeriaService
 
 ' ══════════════════════════════════════
 ' UTILIDADES
@@ -556,7 +833,27 @@ package "Utilidades" #16213e {
     + badgeProximidad(fecha: string): BadgeProximidad
   }
 
+  class WebVitalsUtil <<Utility>> {
+    + iniciarWebVitals(): void
+    - enviar(m: Metric): void
+  }
+
+  class SecureStoreUtil <<Utility>> {
+    + secureGet(key: string): Promise<string>
+    + secureSet(key: string, value: string): Promise<void>
+    + secureRemove(key: string): Promise<void>
+  }
+
+  class TurnstileUtil <<Utility>> {
+    + turnstileHabilitado(): boolean
+    + montarTurnstile(container: HTMLElement): Promise<string>
+  }
+
 }
+
+WebVitalsUtil --> WebVital : envía
+SecureStoreUtil <.. BiometriaService : guarda credenciales
+TurnstileUtil <.. PortalRegistroPage : protege el alta
 
 note right of Cliente
   El cliente puede tener
@@ -579,6 +876,35 @@ note bottom of AuthService
   en usuarios (staff), luego en
   clientes (portal). Un solo
   endpoint para ambos.
+  Los dos tokens NO son
+  intercambiables: el de cliente
+  lleva tipo:'cliente' y sin rol.
+end note
+
+note right of MensajeInterno
+  Una sola tabla para los tres
+  usos, según `tipo`:
+  directo (1:1), sistema
+  (asignaciones automáticas) y
+  broadcast (aviso por rol).
+  La foto no viaja en el listado:
+  se pide por /mensaje/:id/foto
+  y el cliente la cachea por id.
+end note
+
+note right of Configuracion
+  Fila única (id = 1).
+  `horarios` es JSON:
+  [{dia:0..6, abre, cierra, activo}].
+  Define el cupo que ven por igual
+  el portal y el mostrador.
+end note
+
+note bottom of PrecargaPorRol
+  Reemplaza a PreloadAllModules,
+  que bajaba los 83 chunks a todo
+  el mundo. Precarga solo lo del
+  rol y 2 s después del arranque.
 end note
 
 @enduml
