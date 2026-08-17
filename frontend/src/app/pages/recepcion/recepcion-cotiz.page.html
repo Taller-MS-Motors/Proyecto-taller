@@ -83,10 +83,10 @@
       <ion-searchbar mode="ios" class="search" placeholder="Cliente, orden, moto o mecánico"
         [value]="busqueda" (ionInput)="buscar($event)" [debounce]="150"></ion-searchbar>
 
-      <div class="filtros" *ngIf="vista === 'enviada'">
-        <button type="button" class="chip" [class.on]="filtroAprob==='todas'" (click)="setFiltro('todas')">Todas</button>
-        <button type="button" class="chip" [class.on]="filtroAprob==='aprobado'" (click)="setFiltro('aprobado')">Aprobadas</button>
-        <button type="button" class="chip" [class.on]="filtroAprob==='rechazado'" (click)="setFiltro('rechazado')">Rechazadas</button>
+      <div class="chips-filtro" *ngIf="vista === 'enviada'">
+        <button type="button" class="chip-filtro" [class.on]="filtroAprob==='todas'" (click)="setFiltro('todas')">Todas</button>
+        <button type="button" class="chip-filtro" [class.on]="filtroAprob==='aprobado'" (click)="setFiltro('aprobado')">Aprobadas</button>
+        <button type="button" class="chip-filtro" [class.on]="filtroAprob==='rechazado'" (click)="setFiltro('rechazado')">Rechazadas</button>
       </div>
     </ng-container>
 

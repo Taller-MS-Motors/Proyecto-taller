@@ -12,10 +12,35 @@
 
   <div class="rec">
     <div class="segment" *ngIf="!chatAbierto && !verAvisos">
-      <button class="seg-btn" [class.on]="vista==='mecanicos'" (click)="vista='mecanicos'">Mecánicos</button>
-      <button class="seg-btn" [class.on]="vista==='clientes'" (click)="vista='clientes'">Clientes</button>
-      <button class="seg-btn" [class.on]="vista==='taller'" (click)="vista='taller'">Equipo</button>
+      <button class="seg-btn" [class.on]="vista==='mecanicos'" (click)="cambiarVista('mecanicos')">Mecánicos</button>
+      <button class="seg-btn" [class.on]="vista==='clientes'" (click)="cambiarVista('clientes')">Clientes</button>
+      <button class="seg-btn" [class.on]="vista==='taller'" (click)="cambiarVista('taller')">Equipo</button>
     </div>
+
+    <!-- Buscador y filtro. No aplican a Equipo: ese es el chat interno y ya trae su
+         propio buscador de contactos.
+         El filtro cambia según la pestaña porque las dos listas se recorren buscando
+         cosas distintas: de los mecánicos interesa qué se reportó últimamente (los
+         avances viejos ya se reenviaron), y de los clientes, a quién todavía no le
+         llegó el aviso. -->
+    <ng-container *ngIf="vista !== 'taller' && !cargando && hayDatos">
+      <ion-searchbar mode="ios" class="search" [placeholder]="placeholderBusqueda"
+        [value]="busqueda" (ionInput)="buscar($event)" [debounce]="150"></ion-searchbar>
+
+      <div class="chips-filtro" *ngIf="vista === 'mecanicos'">
+        <button type="button" class="chip-filtro" [class.on]="filtroAvances==='todos'" (click)="setFiltroAvances('todos')">Todos</button>
+        <button type="button" class="chip-filtro" [class.on]="filtroAvances==='hoy'" (click)="setFiltroAvances('hoy')">Hoy</button>
+        <button type="button" class="chip-filtro" [class.on]="filtroAvances==='7d'" (click)="setFiltroAvances('7d')">7 días</button>
+        <button type="button" class="chip-filtro" [class.on]="filtroAvances==='30d'" (click)="setFiltroAvances('30d')">30 días</button>
+        <button type="button" class="chip-filtro" [class.on]="filtroAvances==='fotos'" (click)="setFiltroAvances('fotos')">Con fotos</button>
+      </div>
+
+      <div class="chips-filtro" *ngIf="vista === 'clientes'">
+        <button type="button" class="chip-filtro" [class.on]="filtroNotis==='todas'" (click)="setFiltroNotis('todas')">Todas</button>
+        <button type="button" class="chip-filtro" [class.on]="filtroNotis==='no_leidas'" (click)="setFiltroNotis('no_leidas')">Sin leer</button>
+        <button type="button" class="chip-filtro" [class.on]="filtroNotis==='leidas'" (click)="setFiltroNotis('leidas')">Leídas</button>
+      </div>
+    </ng-container>
 
     <!-- Skeleton (el chat trae su propio skeleton) -->
     <div *ngIf="cargando && vista !== 'taller'" style="display:flex;flex-direction:column;gap:12px">
@@ -25,7 +50,7 @@
 
     <!-- De mecánicos -->
     <div class="msg-list" *ngIf="!cargando && vista === 'mecanicos'">
-      <div class="msg-card" *ngFor="let a of avances">
+      <div class="msg-card" *ngFor="let a of avancesFiltrados; trackBy: trackId">
         <div class="msg-head">
           <span class="avatar rose">{{ iniciales(a.tecnico_nombre) }}</span>
           <div class="msg-who">
@@ -43,15 +68,20 @@
           <ion-icon name="logo-whatsapp"></ion-icon> Reenviar a cliente
         </button>
       </div>
-      <div class="empty-state" *ngIf="!avances.length">
-        <ion-icon name="chatbubbles-outline"></ion-icon>
-        <p>Sin avances de mecánicos.</p>
+      <!-- Con un filtro puesto, "Sin avances" haría pensar que se perdieron. -->
+      <div class="empty-state" *ngIf="!avancesFiltrados.length">
+        <ion-icon [name]="avances.length ? 'search-outline' : 'chatbubbles-outline'"></ion-icon>
+        <p *ngIf="!avances.length">Sin avances de mecánicos.</p>
+        <p *ngIf="avances.length">Ningún avance coincide con la búsqueda o el filtro.</p>
+        <button type="button" class="msg-limpiar" *ngIf="avances.length" (click)="limpiarFiltros()">
+          <ion-icon name="close-circle-outline"></ion-icon> Limpiar
+        </button>
       </div>
     </div>
 
     <!-- A clientes -->
     <div class="msg-list" *ngIf="!cargando && vista === 'clientes'">
-      <div class="msg-card" *ngFor="let n of notificaciones">
+      <div class="msg-card" *ngFor="let n of notificacionesFiltradas; trackBy: trackId">
         <div class="msg-head">
           <span class="avatar green">{{ iniciales(n.cliente_nombre, n.cliente_apellido) }}</span>
           <div class="msg-who">
@@ -65,9 +95,13 @@
           <ion-icon name="logo-whatsapp"></ion-icon> Responder
         </button>
       </div>
-      <div class="empty-state" *ngIf="!notificaciones.length">
-        <ion-icon name="mail-outline"></ion-icon>
-        <p>No se han enviado notificaciones.</p>
+      <div class="empty-state" *ngIf="!notificacionesFiltradas.length">
+        <ion-icon [name]="notificaciones.length ? 'search-outline' : 'mail-outline'"></ion-icon>
+        <p *ngIf="!notificaciones.length">No se han enviado notificaciones.</p>
+        <p *ngIf="notificaciones.length">Ninguna coincide con la búsqueda o el filtro.</p>
+        <button type="button" class="msg-limpiar" *ngIf="notificaciones.length" (click)="limpiarFiltros()">
+          <ion-icon name="close-circle-outline"></ion-icon> Limpiar
+        </button>
       </div>
     </div>
 

@@ -119,23 +119,10 @@ input.mo-input, .ce-field input {
   p { font-size: 14px; }
 }
 
-/* ───── Buscador y filtro de la lista ───── */
+/* ───── Buscador de la lista ─────
+   Los chips del filtro (.filtros/.chip) viven en global.scss: los comparten esta
+   pantalla y la de Mensajes, y conviene que un filtro se vea igual en todas. */
 .search { --border-radius: 14px; margin-bottom: 6px; padding: 0; }
-
-.filtros {
-  display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto;
-  // La barra de desplazamiento tapa los chips en pantallas angostas y no hace falta:
-  // se ve que hay más porque el último queda cortado.
-  scrollbar-width: none;
-  &::-webkit-scrollbar { display: none; }
-}
-
-.chip {
-  flex: none; padding: 7px 14px; border-radius: 999px; cursor: pointer;
-  border: 1px solid var(--hairline); background: none; color: var(--n-500);
-  font-family: inherit; font-size: 12.5px; font-weight: 700;
-  &.on { border-color: transparent; background: var(--ion-color-primary); color: #fff; }
-}
 
 /* ───── Selector con buscador (cliente, orden, mecánico) ─────
    Reemplaza al action-sheet del ion-select, que listaba todo de corrido sin forma

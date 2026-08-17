@@ -460,6 +460,46 @@ ion-toast {
   box-shadow: 0 2px 8px rgba(225, 29, 72, 0.25);
 }
 
+// Fila de filtros rápidos. Se distingue del .segment de arriba a propósito: aquel
+// cambia de pantalla (son secciones distintas), esta acota lo que ya se está viendo.
+// Por eso va suelta y no dentro de un carril: se lee como un accesorio de la lista.
+// Es hermana de .pill, que es la insignia de estado — esta se toca, aquella no.
+//
+// El nombre lleva sufijo porque `.filtros` y `.chip` ya están tomados dentro de
+// admin-opiniones y portal-citas, con otro significado: allá `.filtros` es el
+// contenedor de buscador + chips, no la fila en sí. Como los estilos globales no
+// están encapsulados, reusar esos nombres les cambiaría la maqueta.
+.chips-filtro {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  // La barra de desplazamiento tapa los chips en pantallas angostas y no hace falta:
+  // se nota que hay más porque el último queda cortado.
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+}
+.chip-filtro {
+  flex: none;
+  padding: 7px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--n-500);
+  font-family: var(--font-body, inherit);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s var(--ease, cubic-bezier(0.32, 0.72, 0, 1));
+  &:active { transform: scale(.96); }
+}
+.chip-filtro.on {
+  border-color: transparent;
+  background: var(--ion-color-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(225, 29, 72, 0.2);
+}
+
 // Timeline vertical con línea y nodos carmesí
 .timeline {
   position: relative;
