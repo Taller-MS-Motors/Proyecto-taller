@@ -1,0 +1,20 @@
+{
+  "name": "MS Motos · Taller",
+  "short_name": "MS Motos",
+  "description": "Gestión del taller: órdenes, citas, clientes y cotizaciones.",
+  "lang": "es",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#E11D48",
+  "theme_color": "#E11D48",
+  "icons": [
+    {
+      "src": "logo/ms-iso.png",
+      "sizes": "1773x1773",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

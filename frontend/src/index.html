@@ -30,8 +30,17 @@
   <link rel="icon" type="image/png" href="assets/logo/ms-iso.png" />
   <meta name="theme-color" content="#E11D48" />
 
-  <!-- add to homescreen for ios -->
+  <!-- Instalada en la pantalla de inicio, la app abre SIN la barra de direcciones.
+       Hacen falta las dos cosas y por motivos distintos:
+       · Android/Chrome lo decide por `display: standalone` del manifiesto.
+       · iOS/Safari lo decide por `apple-mobile-web-app-capable`; el `mobile-web-app-capable`
+         de abajo es el nombre nuevo y estándar, pero Safari solo lo respeta en versiones
+         recientes, así que se dejan ambos.
+       Ojo: el atajo guarda estos valores el día que se agrega. Si ya está en la pantalla
+       de inicio, hay que borrarlo y volver a agregarlo para que tome el modo standalone. -->
+  <link rel="manifest" href="assets/manifest.webmanifest" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <meta name="apple-mobile-web-app-title" content="MS Motos" />
   <link rel="apple-touch-icon" href="assets/logo/ms-iso.png" />
