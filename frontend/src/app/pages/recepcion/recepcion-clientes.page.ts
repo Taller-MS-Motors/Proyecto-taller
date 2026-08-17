@@ -44,4 +44,8 @@ export class RecepcionClientesPage implements OnInit, OnDestroy {
   whatsapp(c: any, ev: Event) { ev.stopPropagation(); abrirWhatsApp(c.telefono, ''); }
 
   abrirCliente(c: any) { this.router.navigate(['/cliente-detalle', c.id]); }
+
+  // El formulario es el mismo que usa administración. Al guardar hace location.back(),
+  // así que vuelve acá, y ionViewWillEnter recarga la lista: el cliente nuevo ya aparece.
+  nuevoCliente() { this.router.navigate(['/cliente-form']); }
 }

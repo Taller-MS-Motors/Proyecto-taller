@@ -13,6 +13,15 @@
   <div class="rec">
     <ion-searchbar placeholder="Buscar cliente..." (ionInput)="buscar($event)" mode="ios" class="search"></ion-searchbar>
 
+    <!-- Alta de cliente. Recepción es quien atiende el mostrador: si llega alguien que
+         no está en el sistema, tiene que poder registrarlo en el momento sin depender
+         de administración. El permiso ya existía (POST /api/clientes acepta recepcion
+         y admin); lo único que faltaba era la forma de llegar al formulario. -->
+    <button class="cta-outline" (click)="nuevoCliente()">
+      <ion-icon name="person-add-outline"></ion-icon>
+      Nuevo cliente
+    </button>
+
     <!-- Skeleton -->
     <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:10px">
       <div class="skeleton" style="height:68px"></div>
@@ -33,9 +42,15 @@
         </div>
       </div>
 
+      <!-- Buscar a alguien que no está es justo el momento en que hay que darlo de
+           alta, así que la acción se ofrece acá también y no solo arriba. -->
       <div class="empty-state" *ngIf="!clientes.length">
         <ion-icon name="people-outline"></ion-icon>
         <p>No se encontraron clientes.</p>
+        <button class="cta-outline" (click)="nuevoCliente()">
+          <ion-icon name="person-add-outline"></ion-icon>
+          Registrar cliente nuevo
+        </button>
       </div>
     </div>
 
