@@ -499,13 +499,30 @@
   .msg-row { display: flex; }
   .msg-row.mio { justify-content: flex-end; }
   .msg-bubble {
+    // --n-100 sí se redefine en modo oscuro, así que la burbuja recibida acompaña al
+    // tema y el texto sigue leyéndose.
     max-width: 80%; padding: 8px 12px; border-radius: 14px;
     background: var(--n-100, #f3f4f6); border: 1px solid var(--hairline);
     p { margin: 0; font-size: 14px; line-height: 1.4; color: var(--ion-text-color); word-break: break-word; }
   }
-  .msg-row.mio .msg-bubble { background: var(--rose-50, #fff1f2); border-color: transparent; }
+
+  // Mensajes propios. Antes iban sobre --rose-50 con el texto en --ion-text-color,
+  // y esa pareja se rompe en oscuro: los tintes rose son SIEMPRE claros a propósito
+  // (el resto de la app los usa con --rose-700 encima, como en .pill.rose), pero
+  // --ion-text-color pasa a ser casi blanco. Quedaba blanco sobre rosa claro.
+  //
+  // La solución no es elegir otro color fijo, sino un carmesí TRANSLÚCIDO: al
+  // componerse sobre la tarjeta, en claro da el mismo rosa pálido de siempre y en
+  // oscuro un vino apagado. El fondo sigue al tema, así que el texto siempre
+  // contrasta y no hay un segundo valor que mantener sincronizado.
+  .msg-row.mio .msg-bubble {
+    background: rgba(var(--ion-color-primary-rgb), .14);
+    border-color: rgba(var(--ion-color-primary-rgb), .22);
+  }
   .msg-img { max-width: 180px; border-radius: 10px; margin-bottom: 4px; display: block; }
-  .msg-meta { display: block; margin-top: 4px; font-size: 10.5px; color: var(--n-400, #9ca3af); font-weight: 600; }
+  // --n-400 daba 2,2:1 sobre la burbuja en claro, muy por debajo del 4,5 que pide
+  // WCAG para un texto de 10,5 px. --n-600 pasa en los dos temas (7,1:1 y 8,7:1).
+  .msg-meta { display: block; margin-top: 4px; font-size: 10.5px; color: var(--n-600, #525252); font-weight: 600; }
   .msg-rol { color: var(--text-accent, var(--ion-color-primary)); }
   .msg-send {
     display: flex; gap: 8px; align-items: center;
