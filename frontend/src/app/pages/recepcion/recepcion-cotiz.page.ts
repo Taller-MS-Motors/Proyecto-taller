@@ -23,6 +23,12 @@ export class RecepcionCotizPage implements OnInit, OnDestroy {
   // --- Formulario de nueva cotización ---
   mostrarForm = false;
   clientes: any[] = [];
+  // Selector de cliente con buscador. `clientesFiltrados` es un campo y no un getter
+  // a propósito: dentro de un *ngFor, un getter devolvería un arreglo nuevo en cada
+  // ciclo de detección de cambios y Angular volvería a diferenciar la lista entera.
+  pickerCliente = false;
+  busquedaCliente = '';
+  clientesFiltrados: any[] = [];
   ordenesCliente: any[] = [];
   tecnicos: any[] = [];
   guardando = false;
@@ -72,10 +78,48 @@ export class RecepcionCotizPage implements OnInit, OnDestroy {
     this.mostrarForm = true;
     this.form = { cliente_id: null, orden_id: null, tecnico_id: null, piezas: [{ nombre: '', monto: null }], mano_obra: null };
     this.ordenesCliente = [];
-    if (!this.clientes.length) this.rec.getClientes().pipe(takeUntil(this.destroy$)).subscribe({ next: r => this.clientes = r.data });
+    if (!this.clientes.length) {
+      this.rec.getClientes().pipe(takeUntil(this.destroy$)).subscribe({
+        next: r => { this.clientes = r.data; this.clientesFiltrados = r.data; },
+      });
+    }
     this.cargarTecnicos();
   }
   cerrarForm() { this.mostrarForm = false; }
+
+  // ───── Selector de cliente ─────
+  get clienteElegido(): any | null {
+    return this.clientes.find(c => c.id === this.form.cliente_id) || null;
+  }
+
+  abrirPickerCliente() {
+    // Se abre siempre con la lista completa: la búsqueda anterior ya no aplica.
+    this.busquedaCliente = '';
+    this.clientesFiltrados = this.clientes;
+    this.pickerCliente = true;
+  }
+
+  cerrarPickerCliente() { this.pickerCliente = false; }
+
+  filtrarClientes(ev: any) {
+    // Se guarda el texto tal cual se escribió (el input lo refleja con [value]) y se
+    // normaliza aparte: asignar la versión en minúsculas reescribiría lo tecleado.
+    const raw: string = ev?.target?.value ?? '';
+    this.busquedaCliente = raw;
+    const q = raw.trim().toLowerCase();
+    this.clientesFiltrados = !q
+      ? this.clientes
+      : this.clientes.filter(c =>
+          `${c.nombre || ''} ${c.apellido || ''} ${c.telefono || ''} ${c.email || ''}`.toLowerCase().includes(q));
+  }
+
+  elegirCliente(c: any) {
+    this.form.cliente_id = c.id;
+    this.pickerCliente = false;
+    this.onClienteChange();
+  }
+
+  trackId(_i: number, c: any) { return c.id; }
 
   onClienteChange() {
     this.form.orden_id = null;

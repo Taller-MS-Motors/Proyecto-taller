@@ -28,9 +28,12 @@
 
       <div class="field">
         <label>Cliente</label>
-        <ion-select [(ngModel)]="form.cliente_id" (ionChange)="onClienteChange()" placeholder="Elegí un cliente" interface="action-sheet">
-          <ion-select-option *ngFor="let c of clientes" [value]="c.id">{{ c.nombre }} {{ c.apellido }}</ion-select-option>
-        </ion-select>
+        <!-- No es un ion-select: el action-sheet lista TODOS los clientes sin buscador
+             y hay que recorrerlo a dedo. Este botón abre un selector con búsqueda. -->
+        <button type="button" class="picker" (click)="abrirPickerCliente()">
+          <span [class.ph]="!clienteElegido">{{ clienteElegido ? (clienteElegido.nombre + ' ' + clienteElegido.apellido) : 'Elegí un cliente' }}</span>
+          <ion-icon name="chevron-down"></ion-icon>
+        </button>
       </div>
 
       <div class="field">
@@ -144,3 +147,33 @@
     <div style="height:80px"></div>
   </div>
 </ion-content>
+
+<!-- Selector de cliente: buscador + Cancelar.
+     Los clientes ya están todos en memoria (se piden al abrir el formulario), así que
+     el filtro es local y responde mientras se escribe, sin ir al servidor. -->
+<ion-modal class="cli-modal" [isOpen]="pickerCliente" (didDismiss)="cerrarPickerCliente()">
+  <ng-template>
+    <div class="cli-box">
+      <div class="cli-head">
+        <strong>Elegí un cliente</strong>
+        <button type="button" class="cli-cancel" (click)="cerrarPickerCliente()">Cancelar</button>
+      </div>
+
+      <ion-searchbar mode="ios" class="search" placeholder="Nombre, teléfono o correo"
+        [value]="busquedaCliente" (ionInput)="filtrarClientes($event)" [debounce]="120"></ion-searchbar>
+
+      <div class="cli-list">
+        <button type="button" class="cli-row" *ngFor="let c of clientesFiltrados; trackBy: trackId"
+          [class.on]="c.id === form.cliente_id" (click)="elegirCliente(c)">
+          <span class="cli-nom">{{ c.nombre }} {{ c.apellido }}</span>
+          <span class="cli-sub">{{ c.telefono || c.email || 'Sin contacto' }}</span>
+        </button>
+
+        <div class="cli-empty" *ngIf="!clientesFiltrados.length">
+          <ion-icon name="search-outline"></ion-icon>
+          <p>{{ clientes.length ? 'Ningún cliente coincide con la búsqueda.' : 'Todavía no hay clientes cargados.' }}</p>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>
