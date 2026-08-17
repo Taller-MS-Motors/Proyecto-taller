@@ -1,7 +1,15 @@
 # Informe de Pruebas No Funcionales — TallerMS / MS Motos
 
-**Fecha:** 31 de julio de 2026
-**Alcance:** API del backend bajo carga y estrés (§4–§6) y Core Web Vitals del frontend (§6-bis).
+**Fecha:** 31 de julio de 2026 · **Última revisión:** 16 de agosto de 2026
+**Alcance:** API del backend bajo carga y estrés (§4–§6), Core Web Vitals del frontend en
+laboratorio (§6-bis), techo de la mensajería interna (§6-ter) y medición de campo (§6-quater).
+
+> **Cómo leer las secciones nuevas.** Las tablas de resultados de §4, §5 y §6-bis son
+> **mediciones** hechas en las fechas indicadas. Las secciones §6-ter y §6-quater
+> documentan trabajo posterior: los problemas se identificaron leyendo el código, las
+> correcciones **están aplicadas**, y lo que falta es volver a medir para cuantificarlas.
+> Cada afirmación dice de cuál de los dos tipos es; ninguna estimación se presenta como
+> medición.
 
 > **Nota sobre el enunciado.** La guía original asume un backend Laravel/PHP y pide
 > "versión PHP", Laravel Pulse y Telescope. Este proyecto es **Express/Node + MySQL**,
@@ -167,6 +175,25 @@ sin reiniciar nada, y ningún worker murió. Se satura, no se rompe.
 
 ## 6. Hallazgos y acciones correctivas
 
+Resumen de todo lo encontrado, con su estado. "Corregido y medido" significa que hay
+números del antes y el después en este informe; "corregido, falta medir" significa que el
+cambio está en el código y la mejora está razonada, pero no cuantificada con una corrida
+propia.
+
+| # | Hallazgo | Dónde | Estado |
+|---|---|---|---|
+| 1 | Un dato inválido devolvía HTTP 500 | Backend, todas las rutas | ✅ Corregido y medido (6,16 % → 0 % de error) |
+| 2 | El listado de promociones pesaba 3 MB | `GET /api/promos` | ✅ Corregido y medido (3 007 KB → 5,6 KB) |
+| 3 | Un cambio desplegado que no tuvo efecto | Railway / arranque | ✅ Corregido y verificado en producción |
+| 4 | Accesibilidad bajo el objetivo | Registro + toda la app | ✅ Corregido (3 causas), falta remedir |
+| 5 | Los archivos con hash se revalidaban en cada visita | `express.static` | ✅ Corregido, falta remedir |
+| 6-ter · 1 | El hilo del chat devolvía las fotos embebidas | Mensajería | ✅ Corregido, falta medir |
+| 6-ter · 2 | `/contactos` hacía 5 subconsultas por contacto | Mensajería | ✅ Corregido, falta medir |
+| 6-ter · 3 | Faltaban los índices compuestos del chat | `mensajes_internos` | ✅ Corregido, falta medir |
+| §7 · 5 | Se precargaban los 83 chunks a todo el mundo | Enrutador Angular | ✅ Corregido, falta remedir |
+| §7 · 1 | Las imágenes viven en la base en base64 | Arquitectura | ⏳ Abierto — es el techo real |
+| §7 · 6 | 960 ms de respuesta del documento raíz | Hosting | ⏳ Abierto — necesita CDN |
+
 ### Hallazgo 1 — Un dato inválido devolvía HTTP 500
 
 **Detección.** La primera corrida arrojó **6,16 % de error**: las 624 altas de cita
@@ -271,9 +298,14 @@ documento en 170 ms. Buenas prácticas en 100.
 **Lo que hay que mirar.** En móvil, **TBT de 480 ms y TTI de 6,1 s**. Es el costo del
 paquete de JavaScript: 514 KB que el teléfono tiene que descargar, analizar y ejecutar
 antes de que la pantalla responda al primer toque. En un gama media real se siente como
-"se ve pero no reacciona". Es el patrón esperable de una SPA de Angular, y la vía de
-mejora es *lazy loading* por ruta: hoy el portal del cliente arrastra código del panel
-de administración que nunca va a usar.
+"se ve pero no reacciona". Es el patrón esperable de una SPA de Angular.
+
+> **Corregido después.** La primera lectura de este punto fue que faltaba *lazy loading*
+> por ruta —que el portal del cliente arrastraba código del panel de administración—. **Era
+> falso**: la carga diferida ya estaba bien hecha. Lo que sí pasaba es que el enrutador
+> precargaba los 83 chunks a todo el mundo apenas arrancaba. La explicación completa y la
+> corrección están en la **recomendación 5** del §7; se deja acá el diagnóstico original
+> porque entender por qué era equivocado vale más que borrarlo.
 
 **SEO 75** es el puntaje más bajo, pero **no es relevante acá**: es una aplicación tras
 inicio de sesión, no un sitio que deba posicionar en buscadores. Se reporta por
@@ -323,9 +355,11 @@ fortaleza consistente de la aplicación, no un dato suelto de una pantalla.
 Google). Lighthouse señala dos causas, ambas ya identificadas en este informe:
 
 - *"Reduce initial server response time — Root document took 960 ms"*: casi un segundo
-  antes de que el navegador reciba el documento.
-- *"Reduce unused JavaScript — Est savings of 863 KiB"*: es la misma carga diferida por
-  ruta de la recomendación 5, ahora cuantificada.
+  antes de que el navegador reciba el documento. Sigue abierto: es latencia hasta Railway
+  más arranque del contenedor, y se resuelve con un CDN delante (recomendación 6).
+- *"Reduce unused JavaScript — Est savings of 863 KiB"*: **corregido**. No era código mal
+  separado sino la precarga de todos los chunks a todo el mundo; ver recomendación 5.
+  Falta remedir para confirmar cuánto de esos 863 KiB desaparecen.
 
 ---
 
@@ -345,15 +379,35 @@ Google). Lighthouse señala dos causas, ambas ya identificadas en este informe:
    choca con que el sistema ofrezca ajuste de tamaño de texto por accesibilidad: una
    persona con baja visión no puede ampliar.
 
-**Corrección aplicada (la primera).** Los campos sin etiqueta eran **nombre**,
-**apellido** y **confirmar contraseña**. El detalle interesante: el `<input>` real vive
-dentro del shadow DOM de Ionic y no queda asociado al `<ion-label>`, así que los demás
-campos **se salvaban de casualidad** porque su `placeholder` cumple de nombre accesible.
-Los tres que no tenían placeholder quedaban mudos para un lector de pantalla. Se les
-puso `aria-label` explícito, que es la forma correcta y no depende del placeholder.
+**Corrección de la primera.** Los campos sin etiqueta eran **nombre**, **apellido** y
+**confirmar contraseña**. El detalle interesante: el `<input>` real vive dentro del shadow
+DOM de Ionic y no queda asociado al `<ion-label>`, así que los demás campos **se salvaban
+de casualidad** porque su `placeholder` cumple de nombre accesible. Los tres que no tenían
+placeholder quedaban mudos para un lector de pantalla. Se les puso `aria-label` explícito,
+que es la forma correcta y no depende del placeholder.
 
-**La segunda queda pendiente**: `user-scalable=no` es una decisión de producto (afecta
-la sensación de app nativa) y afecta a toda la aplicación, no solo al registro.
+**Corrección de la segunda.** Se quitó `user-scalable=no, maximum-scale=1` del
+`<meta name="viewport">`. Se había dejado pendiente por ser "una decisión de producto"
+(el zoom accidental con dos dedos hace que una app se sienta menos nativa), y se resolvió
+en favor de la accesibilidad por un argumento concreto: **la propia aplicación ofrece un
+ajuste de tamaño de texto**, así que ya había asumido que hay gente que necesita agrandar.
+Bloquear el zoom del sistema mientras se ofrece un sustituto propio y peor no se sostiene.
+Afectaba a **todas** las pantallas, no solo al registro.
+
+**Tercera causa, encontrada después: contraste insuficiente en el panel oscuro.** No la
+reportó la corrida de Lighthouse sobre las pantallas públicas —el panel está detrás de
+inicio de sesión— sino la revisión de los tokens del tema. El token `--tx3` valía
+`#525252`, que sobre los fondos oscuros del panel (`#111111`–`#1a1a1a`) da entre **2,2 y
+2,5:1**, muy lejos del 4,5:1 que exige WCAG AA para texto normal. Se usa en etiquetas de
+sección y textos de apoyo, así que la falla estaba repetida en **todas** las pantallas del
+panel. Se subió a `#8A8A8A`, el gris más tenue que supera 4,5:1 contra el fondo más claro
+de la familia. Mismo caso, y misma corrección, en los dos `#737373` del portal oscuro.
+
+> **Nota de método.** Estas tres correcciones **no están reflejadas en las tablas de
+> puntajes de arriba**: esas corridas son anteriores. Falta volver a medir para
+> cuantificar la mejora; lo esperable es que `registro` supere el 90 de accesibilidad y
+> que el resto suba unos puntos al desaparecer la falla del viewport, que era común a
+> todas las pantallas.
 
 ---
 
@@ -388,6 +442,10 @@ El chat quedó fuera de las corridas anteriores. Se analizó su código y se pre
 a partir del código y del tamaño conocido de las fotos, no mediciones**: sirven para
 saber dónde mirar, no para dar por probado el módulo.
 
+> **Estado: los tres riesgos ya están corregidos en el código.** Cada uno lleva abajo su
+> corrección. Lo que sigue pendiente es **medir**: `mensajeria.js` está escrito y no se ha
+> ejecutado, así que la mejora está razonada y no comprobada con números propios.
+
 ### Lo que hace distinto a este módulo
 
 El costo del chat **no depende de cuánto se escriba**, sino de **cuánta gente lo tenga
@@ -418,8 +476,39 @@ unos **7 Mbps solo de chat** — sin que nadie escriba un mensaje. Es exactament
 problema de las promociones (3 MB por listado) pero repitiéndose **cinco veces por
 minuto y por persona**.
 
-**Corrección análoga a la del hallazgo 2:** que el listado devuelva `tiene_foto` y la
-imagen se pida aparte. Ya es la recomendación 2 del informe; este análisis la cuantifica.
+**Corrección aplicada** (análoga a la del hallazgo 2). `SELECT_MSG` ahora devuelve
+`(m.foto IS NOT NULL) AS tiene_foto` en vez de la imagen, y esta se sirve aparte por
+`GET /api/mensajeria/mensaje/:id/foto`. Lo mismo con los avatares del personal, que
+viajaban en la lista de contactos y en la cabecera del hilo
+(`GET /api/mensajeria/contacto/:id/foto`).
+
+Tres detalles que hacen que la corrección sirva de verdad:
+
+- **El cliente cachea por id de mensaje.** Un mensaje enviado no cambia nunca, así que una
+  vez traída la imagen no se vuelve a pedir. El refresco de 12 s solo busca las de los
+  mensajes nuevos, que casi siempre son cero: **es lo que convierte el polling de mover
+  megabytes a mover texto.** Sin la caché, la corrección solo habría movido el tráfico de
+  una petición a otra.
+- **La foto recién enviada se siembra en la caché** con la copia que ya está en memoria,
+  en vez de volver a bajarla del servidor.
+- **Se reserva el alto de la burbuja** mientras la imagen viaja, para no reintroducir salto
+  de diseño (CLS) justo después de haber medido 0 en todas las pantallas.
+
+El control de acceso de la ruta nueva se escribió explícito: un id de mensaje es un número
+correlativo, así que sin comprobar pertenencia al par cualquiera del personal podría
+recorrer ids y leer fotos de conversaciones ajenas. Devuelve **404 y no 403** cuando no
+corresponde, porque un 403 confirmaría que ese mensaje existe.
+
+| | Antes | Después |
+|---|---|---|
+| Hilo con 20 fotos, por refresco | ~2 MB | ~2 MB la primera vez, **~0 KB** en los siguientes |
+| 5 personas con el chat abierto | ~50 MB/min sostenidos | picos al abrir, sin costo sostenido |
+
+**Lo que la corrección no resuelve.** La primera apertura de un hilo con muchas fotos sigue
+descargando todas —ahora en peticiones paralelas en vez de una sola respuesta—, porque se
+piden las de los 200 mensajes y no solo las visibles en pantalla. El tráfico total de esa
+primera vez es el mismo; lo que desaparece es la **repetición cada 12 s**, que era el
+problema real. Cargar solo las que entran en pantalla queda como mejora posterior.
 
 ### Riesgo 2 — `/contactos` hace 5 subconsultas correlacionadas por contacto
 
@@ -432,6 +521,20 @@ resultado antes de ordenar.
 Con 5 empleados no se nota. El costo crece con el **total de mensajes de la tabla**, no
 con los que se ven en pantalla: cada subconsulta recorre `mensajes_internos` buscando el
 par. Y se ejecuta cada 15 s por cada persona con la pantalla abierta.
+
+**Corrección aplicada.** La consulta pasó a **dos recorridos fijos**, independientes de la
+cantidad de contactos:
+
+- el **último mensaje de cada par**, con `ROW_NUMBER() OVER (PARTITION BY … ORDER BY
+  created_at DESC, id DESC)` sobre los mensajes propios — una sola pasada resuelve de golpe
+  lo que antes eran cuatro subconsultas repetidas por contacto;
+- los **no leídos agrupados por remitente**, con un `GROUP BY` en lugar del `COUNT` con
+  `NOT EXISTS` anidado por fila.
+
+El desempate por `id` no es decorativo: varios mensajes pueden compartir el segundo, y sin
+él la conversación mostraría un "último mensaje" arbitrario. El `ORDER BY` final ahora usa
+una columna del `JOIN` y no una calculada, y los parámetros del query bajaron de 11 a 7.
+De **5·N** recorridos de la tabla a **2**.
 
 ### Riesgo 3 — Faltan los índices que piden esas consultas
 
@@ -450,21 +553,87 @@ CREATE INDEX idx_msg_par_inv ON mensajes_internos (destino_id, remitente_id, cre
 
 Los dos porque la conversación se consulta en ambos sentidos (`A→B` o `B→A`).
 
+**Corrección aplicada.** Los dos índices se crean desde `ensureSchema`
+([`auto-migrate.js`](../backend/src/db/auto-migrate.js)), más un tercero para los avisos,
+que se filtran por rol y se ordenan por fecha:
+
+```sql
+CREATE INDEX idx_msg_broadcast ON mensajes_internos (tipo, destino_rol, created_at);
+```
+
+Van por `ensureSchema` y no por `schema.sql` porque ese archivo tiene `DROP TABLE`: en
+producción el esquema se cambia con migraciones idempotentes, nunca recreando las tablas.
+
 ### Estimación del techo, y por qué hay que medirlo
 
-Juntando lo anterior, el límite **no es la cantidad de mensajes almacenados** sino la
+Juntando lo anterior, el límite **no era la cantidad de mensajes almacenados** sino la
 combinación de tres cosas: cuántas personas tienen el chat abierto, cuántas fotos hay
-entre los últimos 200 de cada hilo, y el total de filas de la tabla (que degrada
+entre los últimos 200 de cada hilo, y el total de filas de la tabla (que degradaba
 `/contactos`).
 
-El orden de magnitud esperable: **el ancho de banda se agota antes que la base**. Con
-20 fotos por hilo y 10 personas con el chat abierto son ~100 MB/min; la base, en cambio,
-aguanta millones de filas si se agregan los índices del riesgo 3.
+El orden de magnitud esperable era: **el ancho de banda se agota antes que la base**. Con
+20 fotos por hilo y 10 personas con el chat abierto, ~100 MB/min; la base, en cambio,
+aguanta millones de filas con los índices del riesgo 3.
 
-`mensajeria.js` mide exactamente eso: registra `peso_hilo_kb` y `peso_contactos_kb`
-además de la latencia, porque en este módulo **los milisegundos engañan si no se ve
-cuántos bytes se movieron**. `seed-carga.js` ahora siembra 5 000 mensajes (10 % con
-foto) para que haya volumen que recorrer.
+Con las tres correcciones, el techo debería moverse de sitio: ya no es el ancho de banda
+sostenido, sino la **frecuencia de refresco** (12 s y 15 s por persona con la pantalla
+abierta), que ahora mueve respuestas de texto. El siguiente límite razonable de encontrar
+es el número de personas con el chat abierto contra el pool de conexiones, no los
+megabytes.
+
+**Eso es exactamente lo que falta comprobar.** `mensajeria.js` registra `peso_hilo_kb` y
+`peso_contactos_kb` además de la latencia, porque en este módulo **los milisegundos engañan
+si no se ve cuántos bytes se movieron**, y `seed-carga.js` ya siembra 5 000 mensajes (10 %
+con foto) para que haya volumen que recorrer. Correrlo antes y después de estas
+correcciones es la forma de convertir las tablas de arriba en medición.
+
+---
+
+## 6-quater. Medición de campo — Core Web Vitals de usuarios reales
+
+Todo lo del §6-bis es **laboratorio**: una herramienta que carga la página en condiciones
+controladas y la mira sin tocarla. Sirve para comparar cambios, pero tiene un punto ciego
+que no se arregla con más corridas: **el INP no existe sin interacción**. Es el tiempo que
+tarda la interfaz en pintar la respuesta a un toque, y Lighthouse no toca nada. Es también
+la métrica que más se parece a la queja real del personal —"se ve pero no reacciona"—, que
+en el §6-bis solo aparece indirectamente, como TBT de 480 ms en móvil.
+
+**Qué se agregó.** La librería oficial `web-vitals` (~2 KB) en el arranque de la
+aplicación ([`web-vitals.util.ts`](../frontend/src/app/shared/web-vitals.util.ts)), que
+observa de forma pasiva LCP, CLS, INP, FCP y TTFB y los envía a
+`POST /api/metricas/web-vitals`. El resumen se consulta por
+`GET /api/metricas/web-vitals` (solo administración) y se guarda en la tabla `web_vitals`.
+
+Cuatro decisiones que vale la pena dejar dichas:
+
+- **Se envía con `sendBeacon`.** Es el único mecanismo que sobrevive al cierre de la
+  pestaña, que es justamente cuando quedan firmes los valores definitivos de CLS e INP. El
+  `fetch` con `keepalive` queda de reserva para navegadores que no lo tengan.
+- **El endpoint de escritura es público a propósito.** Las métricas más valiosas son las de
+  login y registro, que ocurren **antes** de que exista un token. A cambio se valida con
+  dureza: solo los cinco nombres conocidos, valor finito entre 0 y 600 000 ms (un tope que
+  además descarta pestañas que estuvieron en segundo plano) y ruta recortada. Queda dentro
+  del limitador general de `/api`.
+- **Se guarda la ruta sin querystring** y nada más: ni identificador de usuario, ni IP, ni
+  agente. Alcanza para agrupar por pantalla y no convierte una tabla de rendimiento en un
+  registro de actividad de las personas.
+- **Se reporta el percentil 75**, que es el criterio de Google: una métrica "cumple" si el
+  75 % de las visitas la cumple. El promedio escondería justo la cola lenta, que es la que
+  la gente recuerda.
+
+Si algo de esto falla, se ignora en silencio: **medir nunca debe romperle la pantalla a
+nadie**.
+
+**Estado.** Instrumentado y compilando; **sin datos todavía**. Para que la sección tenga
+números hace falta que la versión con la instrumentación esté un tiempo en producción y
+que se use. Además quedan dos cosas abiertas, que se anotan acá para que no se pierdan:
+
+1. **Nadie lee todavía el `GET`.** No hay pantalla que lo muestre, así que los datos solo
+   se ven consultando la API a mano. Corresponde una tarjeta en el panel de administración.
+2. **La tabla no tiene política de retención.** Son cinco filas por carga de página y por
+   persona, sin borrado por antigüedad, sobre una base que ya es el recurso más ajustado
+   del plan de Railway. Hace falta una limpieza periódica —o guardar agregados en vez de
+   cada muestra— antes de dejarla corriendo mucho tiempo.
 
 ---
 
@@ -476,14 +645,26 @@ Lo que este informe **no** demuestra, dicho explícitamente:
    cuesta. Es la razón por la que el hallazgo 2 se ve modesto en milisegundos pese a
    ser 528× menos tráfico. Una medición contra el entorno desplegado daría números
    peores y más realistas.
-2. **Del frontend solo se midieron las tres pantallas públicas** (login, registro,
-   recuperar). Las internas —inicio del cliente, mis citas, ofertas, agenda del
-   mecánico, panel del administrador— están detrás de inicio de sesión y Lighthouse no
-   autentica: haría falta guionarlo con Puppeteer. Son justamente las que cargan datos
-   pesados, así que sus números serán peores que los de esta tabla.
-3. **No se usó WebPageTest** (red simulada 3G/4G, waterfall, filmstrip) ni se midió
-   **INP**: esa métrica necesita interacción real de usuario y no la reporta un análisis
-   de laboratorio; requiere datos de campo con `web-vitals.js`.
+2. **Del frontend solo hay números de las tres pantallas públicas** (login, registro,
+   recuperar). Las internas —inicio del cliente, mis citas, ofertas, agenda del mecánico,
+   panel del administrador— están detrás de inicio de sesión, y Lighthouse no autentica.
+   **Ya no es un impedimento técnico:** [`lighthouse-auth.mjs`](lighthouse-auth.mjs) inicia
+   sesión por la API con Puppeteer, deja el token en `localStorage` y corre Lighthouse
+   sobre ese mismo navegador con `disableStorageReset`. Falta ejecutarlo y volcar los
+   resultados acá. Son justamente las pantallas que cargan datos pesados, así que sus
+   números serán peores que los de esta tabla.
+
+   Vale la pena registrar **por qué hacía falta el guion**: pedirle a Lighthouse
+   `/portal/inicio` sin sesión no falla — el guard de Angular redirige a `/portal/login` y
+   el informe sale igual, con el número de la pantalla equivocada. Se comprobó mirando
+   `finalDisplayedUrl` en el JSON. Un error así no se nota si uno solo mira el puntaje.
+3. **No se usó WebPageTest** (red simulada 3G/4G, waterfall, filmstrip). **Del INP ya hay
+   instrumentación, pero todavía no hay datos:** la métrica no existe sin interacción real,
+   así que se agregaron las dos vías que la producen —
+   [`medir-inp.mjs`](medir-inp.mjs), que abre un navegador, inicia sesión, hace clics
+   reales y lee el INP de la librería oficial; y la recolección de campo descrita en
+   §6-quater, que la mide en los navegadores de quienes usan la app. Falta acumular visitas
+   reales y reportar el percentil 75.
 4. **Los escenarios E1–E6 están escritos pero no ejecutados.** `escenarios.js` quedó
    listo; falta correrlo contra la base sembrada y volcar sus números acá. Los
    resultados de §4 y §5 corresponden a `carga.js` y `estres.js`, que sí se ejecutaron.
@@ -501,25 +682,53 @@ Lo que este informe **no** demuestra, dicho explícitamente:
    Es el techo real: hoy cada foto ocupa 33 % más por el base64, viaja por el pool de
    conexiones y no se puede cachear. Cuanto más se espere, más caro migrar lo ya
    guardado.
-2. **Aplicar el mismo criterio del hallazgo 2 al chat**, que aún envía las fotos de los
-   mensajes dentro del listado.
+2. ~~**Aplicar el mismo criterio del hallazgo 2 al chat**, que aún envía las fotos de los
+   mensajes dentro del listado.~~ **Hecho** (ver §6-ter): el hilo y la lista de contactos
+   devuelven `tiene_foto` y las imágenes se piden aparte y se cachean por id. Falta
+   **medirlo** con `mensajeria.js`.
 3. **Store compartido (Redis) para el limitador de tasa** antes de escalar a varias
    instancias: hoy es por proceso y el cupo efectivo se multiplica.
 4. **Paginación estricta** en los listados globales, que hoy tienen un tope de 500 filas.
-5. ~~**Carga diferida por ruta en el frontend.**~~ **Corregido: este diagnóstico era
-   falso.** Se verificó buscando cadenas propias del panel de administración
-   (`admin-empleados`, "Gestión de Empleados", "Resumen ejecutivo") dentro de
-   `main.js`: **cero apariciones**. La carga diferida por ruta **ya está bien hecha** —
-   el código de la aplicación son 2 198 KB repartidos en 83 chunks que se bajan bajo
-   demanda, y `main.js` contiene solo el framework.
+5. ~~**Carga diferida por ruta en el frontend.**~~ **El diagnóstico era falso, pero había
+   un problema real al lado — y ya está corregido.** Conviene leer las dos partes juntas,
+   porque es el hallazgo del informe que más fácil se malinterpreta.
 
-   El paquete inicial es, entonces, **el piso de Angular + Ionic**, no código de más.
-   También se descartó que arrastrara el compilador JIT: se cambió el arranque a
-   `platformBrowser()` y el archivo resultante salió **con el hash idéntico** (el build
-   moderno ya lo elimina), así que el cambio se revirtió por no aportar nada.
+   **La carga diferida ya estaba bien hecha.** Se verificó buscando cadenas propias del
+   panel de administración (`admin-empleados`, "Gestión de Empleados", "Resumen
+   ejecutivo") dentro de `main.js`: **cero apariciones**. El código de la aplicación son
+   2 198 KB repartidos en 83 chunks que se bajan bajo demanda, y `main.js` contiene solo
+   el framework. También se descartó que arrastrara el compilador JIT: se cambió el
+   arranque a `platformBrowser()` y el archivo resultante salió **con el hash idéntico**
+   (el build moderno ya lo elimina), así que el cambio se revirtió por no aportar nada.
 
-   Consecuencia para el SLO: **el objetivo de < 500 KB no es alcanzable** sin cambiar de
-   framework. Corresponde subirlo (~700 KB) o dejar constancia de por qué se acepta.
+   **Entonces, ¿de dónde salían los 863 KiB de "unused JavaScript" que marcaba
+   Lighthouse?** No de que los chunks estuvieran mal separados, sino de que **se
+   descargaban igual**: el enrutador usaba `PreloadAllModules`, que después de arrancar se
+   baja los 83 chunks **a todo el mundo**. Los archivos estaban bien partidos y aun así
+   viajaban completos. Es un buen recordatorio de que "unused JavaScript" no dice *cómo*
+   llegó ese código al navegador — hay que ir a mirar.
+
+   Para el personal la estrategia tenía sentido: entra a la mañana y navega todo el día,
+   conviene pagar la descarga una vez. Para el cliente del portal no: entra desde el
+   teléfono, mira su cita y se va, y estaba bajando el panel de administración, la
+   recepción y el módulo del mecánico, que **nunca va a poder abrir**. Y ese tráfico compite
+   por el ancho de banda justo mientras la página intenta pintar, así que golpea a FCP, LCP
+   y Speed Index — las tres métricas peores de la tabla del §6-bis en móvil.
+
+   **Corrección aplicada.** Una estrategia propia
+   ([`precarga-por-rol.ts`](../frontend/src/app/shared/precarga-por-rol.ts)) que precarga
+   **solo los módulos que ese rol puede abrir**, y recién **2 s después** del arranque para
+   no competir con el renderizado inicial. Sin sesión no precarga nada: la única pantalla
+   que importa en ese momento es el login, que ya se está cargando, y todavía no se sabe
+   qué va a necesitar esa persona.
+
+   Falta **volver a medir** para cuantificarlo: el número esperable es que el "unused
+   JavaScript" del portal caiga de 863 KiB a casi nada, sin tocar el paquete inicial.
+
+   Consecuencia para el SLO, que no cambia: **el objetivo de < 500 KB de paquete inicial no
+   es alcanzable** sin cambiar de framework —es el piso de Angular + Ionic, hoy 682 KB de
+   `main.js` sin comprimir—. Corresponde subirlo (~700 KB) o dejar constancia de por qué se
+   acepta.
 
 6. **Poner un CDN delante (Cloudflare u otro).** Lighthouse marca
    `server-response-time` en **960 ms** para el documento raíz, con puntuación 0. No es
@@ -537,6 +746,16 @@ for p in login registro recuperar; do
   npx lighthouse <url>/portal/$p --preset=desktop --output=json --output-path=lh-$p-escritorio.json
   npx lighthouse <url>/portal/$p             --output=json --output-path=lh-$p-movil.json   # movil + red simulada
 done
+
+# 0-bis. Pantallas que exigen sesion (portal del cliente y panel del personal).
+# Los scripts .mjs reusan puppeteer-core y lighthouse de la instalacion de npx: si la
+# ruta del cache no es la del equipo donde se escribieron, se indica con NPX_CACHE.
+# NPX_CACHE="$(npm config get cache)/_npx/<hash>/"   # ubicar con: ls "$(npm config get cache)/_npx"
+PORTAL_EMAIL=cliente@correo.com PORTAL_PASS=... node pruebas-carga/lighthouse-auth.mjs
+LOGIN_STAFF=1 EMAIL=admin@taller.com PASS=... node pruebas-carga/lighthouse-auth.mjs
+
+# 0-ter. INP con interaccion real (clics de verdad sobre cada pantalla)
+PORTAL_EMAIL=cliente@correo.com PORTAL_PASS=... node pruebas-carga/medir-inp.mjs
 
 # 1. Base de pruebas
 node backend/src/db/migrate.js                     # con MYSQL_URL apuntando a la base local
