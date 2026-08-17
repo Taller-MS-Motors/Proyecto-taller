@@ -13,10 +13,11 @@
 
 import { createRequire } from 'module';
 import { readFileSync } from 'fs';
+import { rutaNpx } from './npx-cache.mjs';
 
-const CACHE_NPX = process.env.NPX_CACHE ||
-  'C:/Users/Menfi/AppData/Local/npm-cache/_npx/0f94ee7615faf582/';
-const puppeteer = createRequire(CACHE_NPX)('puppeteer-core');
+// El navegador lo maneja puppeteer-core, que ya viene con la instalación de Lighthouse
+// por npx. La carpeta lleva un hash distinto en cada equipo: se busca (ver npx-cache.mjs).
+const puppeteer = createRequire(rutaNpx(['puppeteer-core']))('puppeteer-core');
 
 const BASE = process.env.BASE || 'https://proyecto-taller-production-0e4b.up.railway.app';
 const EDGE = process.env.CHROME_PATH ||

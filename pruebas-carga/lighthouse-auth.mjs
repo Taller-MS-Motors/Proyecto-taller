@@ -21,12 +21,12 @@
 import { createRequire } from 'module';
 import { pathToFileURL } from 'url';
 import { writeFileSync, mkdirSync } from 'fs';
+import { rutaNpx } from './npx-cache.mjs';
 
 // puppeteer-core y lighthouse ya vienen con la instalación de lighthouse por npx;
-// se resuelven desde ahí para no sumar dependencias al proyecto.
-const CACHE_NPX = process.env.NPX_CACHE ||
-  'C:/Users/Menfi/AppData/Local/npm-cache/_npx/0f94ee7615faf582/';
-const req = createRequire(CACHE_NPX);
+// se resuelven desde ahí para no sumar dependencias al proyecto. La carpeta lleva un
+// hash distinto en cada equipo, así que se busca (ver npx-cache.mjs).
+const req = createRequire(rutaNpx(['puppeteer-core', 'lighthouse']));
 const puppeteer = req('puppeteer-core');
 const lighthouse = (await import(pathToFileURL(req.resolve('lighthouse')).href)).default;
 
