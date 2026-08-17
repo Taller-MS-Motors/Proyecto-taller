@@ -7,6 +7,10 @@ import { abrirWhatsApp } from '../../shared/whatsapp.util';
 
 interface PiezaNueva { nombre: string; monto: number | null; }
 
+// Los tres campos del formulario que se eligen de una lista. Comparten un solo
+// selector: lo que cambia es de dónde salen las opciones y cómo se rotulan.
+type CampoPicker = 'cliente' | 'orden' | 'tecnico';
+
 @Component({
   standalone: false,
   selector: 'app-recepcion-cotiz',
@@ -20,15 +24,20 @@ export class RecepcionCotizPage implements OnInit, OnDestroy {
   repuestos: Record<number, any[]> = {};
   cargando = true;
 
+  // Buscador y filtro de la lista. Como en el selector, la lista mostrada es un campo
+  // y no un getter: dentro de un *ngFor, un getter devuelve un arreglo nuevo en cada
+  // ciclo de detección de cambios y Angular vuelve a diferenciar todo en cada tecla.
+  busqueda = '';
+  filtroAprob: 'todas' | 'aprobado' | 'rechazado' = 'todas';
+  cotizacionesFiltradas: any[] = [];
+
   // --- Formulario de nueva cotización ---
   mostrarForm = false;
   clientes: any[] = [];
-  // Selector de cliente con buscador. `clientesFiltrados` es un campo y no un getter
-  // a propósito: dentro de un *ngFor, un getter devolvería un arreglo nuevo en cada
-  // ciclo de detección de cambios y Angular volvería a diferenciar la lista entera.
-  pickerCliente = false;
-  busquedaCliente = '';
-  clientesFiltrados: any[] = [];
+  // Selector compartido: qué campo está abierto, qué se escribió y qué queda visible.
+  picker: CampoPicker | null = null;
+  busquedaPicker = '';
+  opcionesFiltradas: any[] = [];
   ordenesCliente: any[] = [];
   tecnicos: any[] = [];
   guardando = false;
@@ -43,6 +52,13 @@ export class RecepcionCotizPage implements OnInit, OnDestroy {
   readonly aprobLabel: Record<string, string> = { pendiente: 'Pendiente', aprobado: 'Aprobado', rechazado: 'Rechazado' };
   readonly aprobPill: Record<string, string> = { pendiente: 'amber', aprobado: 'green', rechazado: 'rose' };
 
+  // Los textos del selector, juntos: son lo único que cambia entre los tres campos.
+  private readonly TEXTOS: Record<CampoPicker, { titulo: string; placeholder: string; vacio: string }> = {
+    cliente: { titulo: 'Elegí un cliente', placeholder: 'Nombre, teléfono o correo', vacio: 'Ningún cliente coincide con la búsqueda.' },
+    orden:   { titulo: 'Elegí la orden', placeholder: 'Número de orden, moto o placa', vacio: 'Ninguna orden coincide con la búsqueda.' },
+    tecnico: { titulo: 'Asignar mecánico', placeholder: 'Nombre del mecánico', vacio: 'Ningún mecánico coincide con la búsqueda.' },
+  };
+
   constructor(private rec: RecepcionService, private toast: ToastController, private alert: AlertController) {}
 
   ngOnInit() { this.cargar(); }
@@ -54,6 +70,7 @@ export class RecepcionCotizPage implements OnInit, OnDestroy {
     this.rec.getCotizaciones(this.vista).pipe(takeUntil(this.destroy$)).subscribe({
       next: r => {
         this.cotizaciones = r.data;
+        this.aplicarFiltros();
         this.repuestos = {};
         if (r.data.length) {
           const calls = r.data.map(o => this.rec.getRepuestos(o.id));
@@ -80,46 +97,130 @@ export class RecepcionCotizPage implements OnInit, OnDestroy {
     this.ordenesCliente = [];
     if (!this.clientes.length) {
       this.rec.getClientes().pipe(takeUntil(this.destroy$)).subscribe({
-        next: r => { this.clientes = r.data; this.clientesFiltrados = r.data; },
+        // Si llegan con el selector ya abierto, se refleja sin tener que cerrarlo.
+        next: r => { this.clientes = r.data; if (this.picker === 'cliente') this.opcionesFiltradas = r.data; },
       });
     }
     this.cargarTecnicos();
   }
   cerrarForm() { this.mostrarForm = false; }
 
-  // ───── Selector de cliente ─────
-  get clienteElegido(): any | null {
-    return this.clientes.find(c => c.id === this.form.cliente_id) || null;
+  // ───── Selector compartido (cliente, orden, mecánico) ─────
+  get clienteElegido(): any | null { return this.clientes.find(c => c.id === this.form.cliente_id) || null; }
+  get ordenElegida(): any | null { return this.ordenesCliente.find(o => o.id === this.form.orden_id) || null; }
+  get tecnicoElegido(): any | null { return this.tecnicos.find(t => t.id === this.form.tecnico_id) || null; }
+
+  get pickerTitulo(): string { return this.picker ? this.TEXTOS[this.picker].titulo : ''; }
+  get pickerPlaceholder(): string { return this.picker ? this.TEXTOS[this.picker].placeholder : ''; }
+  get pickerVacio(): string { return this.picker ? this.TEXTOS[this.picker].vacio : ''; }
+
+  // De dónde salen las opciones de cada campo.
+  private opcionesDe(campo: CampoPicker): any[] {
+    if (campo === 'cliente') return this.clientes;
+    if (campo === 'orden') return this.ordenesCliente;
+    // El mecánico es opcional, así que tiene que poder dejarse sin asignar: con el
+    // action-sheet, una vez elegido uno no había forma de volver atrás.
+    return [{ id: null, nombre: 'Sin asignar' }, ...this.tecnicos];
   }
 
-  abrirPickerCliente() {
+  abrirPicker(campo: CampoPicker) {
+    // Sin cliente no hay órdenes que mostrar; el botón ya viene deshabilitado, esto
+    // cubre el caso de que se lo llame igual.
+    if (campo === 'orden' && !this.form.cliente_id) return;
     // Se abre siempre con la lista completa: la búsqueda anterior ya no aplica.
-    this.busquedaCliente = '';
-    this.clientesFiltrados = this.clientes;
-    this.pickerCliente = true;
+    this.picker = campo;
+    this.busquedaPicker = '';
+    this.opcionesFiltradas = this.opcionesDe(campo);
   }
 
-  cerrarPickerCliente() { this.pickerCliente = false; }
+  cerrarPicker() { this.picker = null; }
 
-  filtrarClientes(ev: any) {
+  filtrarPicker(ev: any) {
     // Se guarda el texto tal cual se escribió (el input lo refleja con [value]) y se
     // normaliza aparte: asignar la versión en minúsculas reescribiría lo tecleado.
     const raw: string = ev?.target?.value ?? '';
-    this.busquedaCliente = raw;
+    this.busquedaPicker = raw;
+    if (!this.picker) return;
     const q = raw.trim().toLowerCase();
-    this.clientesFiltrados = !q
-      ? this.clientes
-      : this.clientes.filter(c =>
-          `${c.nombre || ''} ${c.apellido || ''} ${c.telefono || ''} ${c.email || ''}`.toLowerCase().includes(q));
+    const todas = this.opcionesDe(this.picker);
+    this.opcionesFiltradas = !q ? todas : todas.filter(o => this.textoDe(o).toLowerCase().includes(q));
   }
 
-  elegirCliente(c: any) {
-    this.form.cliente_id = c.id;
-    this.pickerCliente = false;
-    this.onClienteChange();
+  // Lo que se compara al buscar: los mismos datos que se ven en la fila, más los que
+  // uno tiene a mano para buscar (la placa de la moto, el correo del cliente).
+  private textoDe(o: any): string {
+    if (this.picker === 'cliente') return `${o.nombre || ''} ${o.apellido || ''} ${o.telefono || ''} ${o.email || ''}`;
+    if (this.picker === 'orden') return `${o.numero_orden || ''} ${o.marca || ''} ${o.modelo || ''} ${o.placa || ''}`;
+    return `${o.nombre || ''}`;
   }
 
-  trackId(_i: number, c: any) { return c.id; }
+  tituloOpcion(o: any): string {
+    if (this.picker === 'cliente') return `${o.nombre} ${o.apellido}`;
+    if (this.picker === 'orden') return o.numero_orden;
+    return o.nombre;
+  }
+
+  subtituloOpcion(o: any): string {
+    if (this.picker === 'cliente') return o.telefono || o.email || 'Sin contacto';
+    if (this.picker === 'orden') return [`${o.marca || ''} ${o.modelo || ''}`.trim(), o.placa].filter(Boolean).join(' · ');
+    return o.id === null ? 'La cotización queda sin mecánico' : '';
+  }
+
+  esElegida(o: any): boolean {
+    if (this.picker === 'cliente') return o.id === this.form.cliente_id;
+    if (this.picker === 'orden') return o.id === this.form.orden_id;
+    return o.id === this.form.tecnico_id;
+  }
+
+  elegirOpcion(o: any) {
+    const campo = this.picker;
+    this.picker = null;
+    if (campo === 'cliente') { this.form.cliente_id = o.id; this.onClienteChange(); }
+    else if (campo === 'orden') { this.form.orden_id = o.id; this.onOrdenChange(); }
+    else if (campo === 'tecnico') { this.form.tecnico_id = o.id; }
+  }
+
+  // Sirve para las opciones del selector y para las tarjetas de la lista: en ambos
+  // casos la identidad es el id. La opción "Sin asignar" no tiene, de ahí el -1.
+  trackId(_i: number, x: any) { return x?.id ?? -1; }
+
+  // ───── Buscador y filtro de la lista ─────
+  cambiarVista(v: 'pendiente' | 'enviada') {
+    if (this.vista === v) return;
+    this.vista = v;
+    // Se limpian al cambiar de pestaña: un filtro heredado de la otra vista deja la
+    // lista vacía sin motivo aparente.
+    this.limpiarFiltros(false);
+    this.cargar();
+  }
+
+  buscar(ev: any) {
+    this.busqueda = ev?.target?.value ?? '';
+    this.aplicarFiltros();
+  }
+
+  setFiltro(f: 'todas' | 'aprobado' | 'rechazado') {
+    this.filtroAprob = f;
+    this.aplicarFiltros();
+  }
+
+  limpiarFiltros(aplicar = true) {
+    this.busqueda = '';
+    this.filtroAprob = 'todas';
+    if (aplicar) this.aplicarFiltros();
+  }
+
+  private aplicarFiltros() {
+    const q = this.busqueda.trim().toLowerCase();
+    this.cotizacionesFiltradas = this.cotizaciones.filter(o => {
+      // El filtro por aprobación solo tiene sentido en Enviadas: en Pendientes todas
+      // están sin responder y no habría nada que separar.
+      if (this.vista === 'enviada' && this.filtroAprob !== 'todas' && o.aprobacion_cliente !== this.filtroAprob) return false;
+      if (!q) return true;
+      return `${o.cliente_nombre || ''} ${o.cliente_apellido || ''} ${o.numero_orden || ''} ${o.marca || ''} ${o.modelo || ''} ${o.placa || ''} ${o.tecnico_nombre || ''}`
+        .toLowerCase().includes(q);
+    });
+  }
 
   onClienteChange() {
     this.form.orden_id = null;

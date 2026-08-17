@@ -12,8 +12,8 @@
 
   <div class="rec">
     <div class="segment">
-      <button class="seg-btn" [class.on]="vista==='pendiente'" (click)="vista='pendiente'; cargar()">Pendientes</button>
-      <button class="seg-btn" [class.on]="vista==='enviada'" (click)="vista='enviada'; cargar()">Enviadas</button>
+      <button class="seg-btn" [class.on]="vista==='pendiente'" (click)="cambiarVista('pendiente')">Pendientes</button>
+      <button class="seg-btn" [class.on]="vista==='enviada'" (click)="cambiarVista('enviada')">Enviadas</button>
     </div>
 
     <!-- Botón nueva cotización -->
@@ -26,11 +26,12 @@
     <section class="card form-card" *ngIf="mostrarForm">
       <span class="section-label">Nueva cotización</span>
 
+      <!-- Los tres campos abren el mismo selector con buscador. No son ion-select:
+           el action-sheet lista todo de corrido, sin forma de buscar ni de ver el
+           dato de apoyo (el teléfono del cliente, la moto de la orden). -->
       <div class="field">
         <label>Cliente</label>
-        <!-- No es un ion-select: el action-sheet lista TODOS los clientes sin buscador
-             y hay que recorrerlo a dedo. Este botón abre un selector con búsqueda. -->
-        <button type="button" class="picker" (click)="abrirPickerCliente()">
+        <button type="button" class="picker" (click)="abrirPicker('cliente')">
           <span [class.ph]="!clienteElegido">{{ clienteElegido ? (clienteElegido.nombre + ' ' + clienteElegido.apellido) : 'Elegí un cliente' }}</span>
           <ion-icon name="chevron-down"></ion-icon>
         </button>
@@ -38,17 +39,19 @@
 
       <div class="field">
         <label>Orden</label>
-        <ion-select [(ngModel)]="form.orden_id" (ionChange)="onOrdenChange()" placeholder="Orden activa del cliente" interface="action-sheet" [disabled]="!form.cliente_id">
-          <ion-select-option *ngFor="let o of ordenesCliente" [value]="o.id">{{ o.numero_orden }} — {{ o.marca }} {{ o.modelo }}</ion-select-option>
-        </ion-select>
+        <button type="button" class="picker" [disabled]="!form.cliente_id" (click)="abrirPicker('orden')">
+          <span [class.ph]="!ordenElegida">{{ ordenElegida ? (ordenElegida.numero_orden + ' — ' + ordenElegida.marca + ' ' + ordenElegida.modelo) : 'Orden activa del cliente' }}</span>
+          <ion-icon name="chevron-down"></ion-icon>
+        </button>
         <p class="hint" *ngIf="form.cliente_id && !ordenesCliente.length">Este cliente no tiene órdenes activas.</p>
       </div>
 
       <div class="field">
         <label>Mecánico</label>
-        <ion-select [(ngModel)]="form.tecnico_id" placeholder="Asignar mecánico (opcional)" interface="action-sheet">
-          <ion-select-option *ngFor="let t of tecnicos" [value]="t.id">{{ t.nombre }}</ion-select-option>
-        </ion-select>
+        <button type="button" class="picker" (click)="abrirPicker('tecnico')">
+          <span [class.ph]="!tecnicoElegido">{{ tecnicoElegido ? tecnicoElegido.nombre : 'Asignar mecánico (opcional)' }}</span>
+          <ion-icon name="chevron-down"></ion-icon>
+        </button>
       </div>
 
       <label class="piezas-lbl">Piezas</label>
@@ -74,6 +77,19 @@
       </ion-button>
     </section>
 
+    <!-- Buscador y filtro de la lista. El filtro por aprobación solo se ofrece en
+         Enviadas: en Pendientes todas están, por definición, sin responder. -->
+    <ng-container *ngIf="!mostrarForm && !cargando && cotizaciones.length">
+      <ion-searchbar mode="ios" class="search" placeholder="Cliente, orden, moto o mecánico"
+        [value]="busqueda" (ionInput)="buscar($event)" [debounce]="150"></ion-searchbar>
+
+      <div class="filtros" *ngIf="vista === 'enviada'">
+        <button type="button" class="chip" [class.on]="filtroAprob==='todas'" (click)="setFiltro('todas')">Todas</button>
+        <button type="button" class="chip" [class.on]="filtroAprob==='aprobado'" (click)="setFiltro('aprobado')">Aprobadas</button>
+        <button type="button" class="chip" [class.on]="filtroAprob==='rechazado'" (click)="setFiltro('rechazado')">Rechazadas</button>
+      </div>
+    </ng-container>
+
     <!-- Skeleton -->
     <div *ngIf="cargando" style="display:flex;flex-direction:column;gap:12px;margin-top:6px">
       <div class="skeleton" style="height:170px"></div>
@@ -82,7 +98,7 @@
 
     <!-- Lista de cotizaciones -->
     <div class="cotiz-list" *ngIf="!cargando">
-      <div class="card cotiz-card" *ngFor="let o of cotizaciones">
+      <div class="card cotiz-card" *ngFor="let o of cotizacionesFiltradas; trackBy: trackId">
         <div class="cz-top">
           <div>
             <strong>{{ o.cliente_nombre }} {{ o.cliente_apellido }}</strong>
@@ -138,9 +154,15 @@
         </div>
       </div>
 
-      <div class="empty-state" *ngIf="!cotizaciones.length">
-        <ion-icon name="receipt-outline"></ion-icon>
-        <p>No hay cotizaciones {{ vista === 'pendiente' ? 'pendientes' : 'enviadas' }}.</p>
+      <!-- Se distingue "no hay nada" de "no hay nada que coincida": con un filtro
+           puesto, el mismo mensaje haría pensar que se perdieron las cotizaciones. -->
+      <div class="empty-state" *ngIf="!cotizacionesFiltradas.length">
+        <ion-icon [name]="cotizaciones.length ? 'search-outline' : 'receipt-outline'"></ion-icon>
+        <p *ngIf="!cotizaciones.length">No hay cotizaciones {{ vista === 'pendiente' ? 'pendientes' : 'enviadas' }}.</p>
+        <p *ngIf="cotizaciones.length">Ninguna coincide con la búsqueda o el filtro.</p>
+        <button type="button" class="link-add" *ngIf="cotizaciones.length" (click)="limpiarFiltros()">
+          <ion-icon name="close-circle-outline"></ion-icon> Limpiar
+        </button>
       </div>
     </div>
 
@@ -148,30 +170,31 @@
   </div>
 </ion-content>
 
-<!-- Selector de cliente: buscador + Cancelar.
-     Los clientes ya están todos en memoria (se piden al abrir el formulario), así que
-     el filtro es local y responde mientras se escribe, sin ir al servidor. -->
-<ion-modal class="cli-modal" [isOpen]="pickerCliente" (didDismiss)="cerrarPickerCliente()">
+<!-- Selector con buscador y Cancelar, compartido por los tres campos del formulario.
+     Uno solo y no tres iguales: cambia qué lista muestra, no cómo se ve ni cómo se
+     usa. Las opciones ya están en memoria, así que el filtro es local y responde
+     mientras se escribe, sin ir al servidor. -->
+<ion-modal class="pk-modal" [isOpen]="!!picker" (didDismiss)="cerrarPicker()">
   <ng-template>
-    <div class="cli-box">
-      <div class="cli-head">
-        <strong>Elegí un cliente</strong>
-        <button type="button" class="cli-cancel" (click)="cerrarPickerCliente()">Cancelar</button>
+    <div class="pk-box">
+      <div class="pk-head">
+        <strong>{{ pickerTitulo }}</strong>
+        <button type="button" class="pk-cancel" (click)="cerrarPicker()">Cancelar</button>
       </div>
 
-      <ion-searchbar mode="ios" class="search" placeholder="Nombre, teléfono o correo"
-        [value]="busquedaCliente" (ionInput)="filtrarClientes($event)" [debounce]="120"></ion-searchbar>
+      <ion-searchbar mode="ios" class="search" [placeholder]="pickerPlaceholder"
+        [value]="busquedaPicker" (ionInput)="filtrarPicker($event)" [debounce]="120"></ion-searchbar>
 
-      <div class="cli-list">
-        <button type="button" class="cli-row" *ngFor="let c of clientesFiltrados; trackBy: trackId"
-          [class.on]="c.id === form.cliente_id" (click)="elegirCliente(c)">
-          <span class="cli-nom">{{ c.nombre }} {{ c.apellido }}</span>
-          <span class="cli-sub">{{ c.telefono || c.email || 'Sin contacto' }}</span>
+      <div class="pk-list">
+        <button type="button" class="pk-row" *ngFor="let o of opcionesFiltradas; trackBy: trackId"
+          [class.on]="esElegida(o)" (click)="elegirOpcion(o)">
+          <span class="pk-nom">{{ tituloOpcion(o) }}</span>
+          <span class="pk-sub" *ngIf="subtituloOpcion(o)">{{ subtituloOpcion(o) }}</span>
         </button>
 
-        <div class="cli-empty" *ngIf="!clientesFiltrados.length">
+        <div class="pk-empty" *ngIf="!opcionesFiltradas.length">
           <ion-icon name="search-outline"></ion-icon>
-          <p>{{ clientes.length ? 'Ningún cliente coincide con la búsqueda.' : 'Todavía no hay clientes cargados.' }}</p>
+          <p>{{ pickerVacio }}</p>
         </div>
       </div>
     </div>
